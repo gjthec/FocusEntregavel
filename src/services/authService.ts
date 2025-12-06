@@ -1,4 +1,4 @@
-import { User } from "../../../FocusProBackend/src/types";
+import { User } from "../types";
 import { supabase } from "./supabase";
 
 export const AuthService = {
