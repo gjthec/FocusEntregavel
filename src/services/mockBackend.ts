@@ -10,7 +10,7 @@ import {
   Comment,
   CommunityPost,
   CommunityComment,
-} from "../../../FocusProBackend/src/types";
+} from "../types";
 
 const STORAGE_KEYS = {
   USERS: "focuspro_users",

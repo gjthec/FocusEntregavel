@@ -9,7 +9,7 @@ import {
   Comment,
   CommunityPost,
   CommunityComment,
-} from "../../../FocusProBackend/src/types";
+} from "../types";
 
 export const DataService = {
   // --- USERS (Admin) ---
