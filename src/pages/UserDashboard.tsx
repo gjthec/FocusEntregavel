@@ -179,6 +179,9 @@ export const UserDashboard: React.FC = () => {
   const [showMoodModal, setShowMoodModal] = useState(false);
   const [moodModalQuote, setMoodModalQuote] = useState("");
 
+  // Routine load indicator
+  const [loadingRoutineId, setLoadingRoutineId] = useState<string | null>(null);
+
   const POMODORO_TIME = 25 * 60;
 
   // --- Weekly Summary Mock Data ---
@@ -541,6 +544,28 @@ export const UserDashboard: React.FC = () => {
     }
   };
 
+  const fetchAndSelectRoutine = async (routineId: string) => {
+    setLoadingRoutineId(routineId);
+    try {
+      const latestRoutine = await DataService.getRoutineById(routineId);
+      if (latestRoutine) {
+        setSelectedRoutine(latestRoutine);
+        setRoutines((prev) =>
+          prev.map((r) => (r.id === routineId ? latestRoutine : r))
+        );
+      } else {
+        setSelectedRoutine(
+          routines.find((r) => r.id === routineId) || null
+        );
+      }
+    } catch (error) {
+      console.error("Error loading routine details", error);
+      setSelectedRoutine(routines.find((r) => r.id === routineId) || null);
+    } finally {
+      setLoadingRoutineId(null);
+    }
+  };
+
   const handleExportReport = () => {
     setExportingReport(true);
     // ... same logic for CSV export ...
@@ -846,7 +871,7 @@ export const UserDashboard: React.FC = () => {
                   >
                     <div
                       className="p-3 bg-white dark:bg-slate-800 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700"
-                      onClick={() => setSelectedRoutine(routine)}
+                      onClick={() => fetchAndSelectRoutine(routine.id)}
                     >
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400">
@@ -871,10 +896,14 @@ export const UserDashboard: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <ArrowRight
-                        size={16}
-                        className="text-slate-300 dark:text-slate-600"
-                      />
+                      {loadingRoutineId === routine.id ? (
+                        <Loader2 className="animate-spin text-blue-500" size={16} />
+                      ) : (
+                        <ArrowRight
+                          size={16}
+                          className="text-slate-300 dark:text-slate-600"
+                        />
+                      )}
                     </div>
                     <div className="h-1 w-full bg-slate-100 dark:bg-slate-700">
                       <div

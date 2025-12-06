@@ -106,6 +106,32 @@ export const DataService = {
   },
 
   // --- ROUTINES ---
+  getRoutineById: async (routineId: string): Promise<Routine | null> => {
+    const { data, error } = await supabase
+      .from("routines")
+      .select("*")
+      .eq("id", routineId)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116" || error.details?.includes("0 rows")) {
+        return null;
+      }
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      title: data.title,
+      time: data.time,
+      category: data.category,
+      frequency: data.frequency || [],
+      steps: data.steps || [],
+      completed: data.completed,
+    };
+  },
+
   getRoutines: async (userId: string): Promise<Routine[]> => {
     const { data, error } = await supabase
       .from("routines")
