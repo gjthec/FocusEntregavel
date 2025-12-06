@@ -15,8 +15,17 @@ export const DataService = {
   // --- USERS (Admin) ---
   getUsers: async (): Promise<User[]> => {
     const client = supabaseAdmin || supabase;
-    const { data, error } = await client.from("profiles").select("*");
-    if (error) throw error;
+    const { data, error, status } = await client.from("profiles").select("*");
+
+    if (error) {
+      // Most common cause is missing service-role key while RLS is enabled
+      if (!supabaseAdmin && status === 403) {
+        throw new Error(
+          "A listagem de usuários requer a chave de service role (VITE_SUPABASE_SERVICE_ROLE_KEY) ou políticas RLS específicas para admins."
+        );
+      }
+      throw error;
+    }
     return data.map((p: any) => ({
       id: p.id,
       email: p.email,

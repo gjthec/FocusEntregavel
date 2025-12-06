@@ -31,6 +31,7 @@ export const AdminDashboard: React.FC = () => {
     type: "success" | "error";
     msg: string;
   } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -40,8 +41,14 @@ export const AdminDashboard: React.FC = () => {
     try {
       const data = await DataService.getUsers();
       setUsers(data);
+      setLoadError(null);
     } catch (err) {
       console.error(err);
+      setLoadError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao carregar usuários. Verifique a chave service role ou as políticas RLS."
+      );
     }
   };
 
@@ -166,6 +173,11 @@ export const AdminDashboard: React.FC = () => {
           <p className="text-slate-500 dark:text-slate-400">
             Gerenciar usuários e assinaturas.
           </p>
+          {loadError && (
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+              {loadError}
+            </p>
+          )}
         </div>
         <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-2 w-full md:w-64 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
           <Search size={20} className="text-slate-400" />
