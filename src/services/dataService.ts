@@ -16,7 +16,6 @@ export const DataService = {
   getUsers: async (): Promise<User[]> => {
     const client = supabaseAdmin || supabase;
     const { data, error, status } = await client.from("profiles").select("*");
-
     if (error) {
       // Most common cause is missing service-role key while RLS is enabled
       if (!supabaseAdmin && status === 403) {
