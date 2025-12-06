@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase, supabaseAdmin } from "./supabase";
 import {
   User,
   Task,
@@ -14,7 +14,8 @@ import {
 export const DataService = {
   // --- USERS (Admin) ---
   getUsers: async (): Promise<User[]> => {
-    const { data, error } = await supabase.from("profiles").select("*");
+    const client = supabaseAdmin || supabase;
+    const { data, error } = await client.from("profiles").select("*");
     if (error) throw error;
     return data.map((p: any) => ({
       id: p.id,
@@ -31,7 +32,8 @@ export const DataService = {
     plan: PlanTier,
     role: UserRole
   ) => {
-    const { error } = await supabase
+    const client = supabaseAdmin || supabase;
+    const { error } = await client
       .from("profiles")
       .update({ plan, role })
       .eq("id", userId);
@@ -40,7 +42,8 @@ export const DataService = {
 
   deleteUser: async (userId: string) => {
     // Supabase cascade delete should handle relations if configured, otherwise delete manually
-    const { error } = await supabase.from("profiles").delete().eq("id", userId);
+    const client = supabaseAdmin || supabase;
+    const { error } = await client.from("profiles").delete().eq("id", userId);
     if (error) throw error;
   },
 
