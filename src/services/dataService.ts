@@ -412,6 +412,34 @@ export const DataService = {
       .eq("id", commentId);
     if (error) throw error;
   },
+  getCourseModulesWithLessons: async () => {
+    const { data, error } = await supabase
+      .from("course_modules")
+      .select(
+        `
+        id,
+        title,
+        description,
+        duration,
+        locked,
+        icon,
+        sort_order,
+        lessons (
+          id,
+          title,
+          duration,
+          type,
+          youtube_url,
+          order_index
+        )
+      `
+      )
+      .order("sort_order", { ascending: true })
+      .order("order_index", { foreignTable: "lessons", ascending: true });
+
+    if (error) throw error;
+    return data;
+  },
 
   getLessonRating: async (lessonId: string, userId: string) => {
     const { data: ratings, error } = await supabase

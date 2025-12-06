@@ -1,12 +1,12 @@
 export enum UserRole {
-  ADMIN = 'ADMIN',
-  USER = 'USER'
+  ADMIN = "ADMIN",
+  USER = "USER",
 }
 
 export enum PlanTier {
-  BASIC = 'Basic',
-  PRO = 'Pro',
-  PREMIUM = 'Premium'
+  BASIC = "Basic",
+  PRO = "Pro",
+  PREMIUM = "Premium",
 }
 
 export interface User {
@@ -17,10 +17,17 @@ export interface User {
   plan: PlanTier;
   joinedDate: string;
   password?: string; // Optional for security in frontend, but used in mock storage
-  authProvider?: 'email' | 'google';
+  authProvider?: "email" | "google";
 }
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'paused' | 'blocked' | 'canceled' | 'deferred';
+export type TaskStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "paused"
+  | "blocked"
+  | "canceled"
+  | "deferred";
 
 export interface Task {
   id: string;
@@ -29,7 +36,7 @@ export interface Task {
   status: TaskStatus;
   completed?: boolean; // Deprecated, kept for migration
   createdAt: string;
-  priority: 'low' | 'medium' | 'high';
+  priority: "low" | "medium" | "high";
 }
 
 export interface RoutineStep {
@@ -43,13 +50,20 @@ export interface Routine {
   userId: string;
   title: string;
   time: string; // e.g. "08:00"
-  category: 'morning' | 'afternoon' | 'night' | 'health' | 'productivity' | 'focus' | 'emotional';
+  category:
+    | "morning"
+    | "afternoon"
+    | "night"
+    | "health"
+    | "productivity"
+    | "focus"
+    | "emotional";
   frequency: string[]; // ['Seg', 'Ter', ...]
   steps: RoutineStep[];
   completed: boolean; // Computed based on steps usually
 }
 
-export type MoodType = 'great' | 'good' | 'neutral' | 'bad' | 'terrible';
+export type MoodType = "great" | "good" | "neutral" | "bad" | "terrible";
 
 export interface JournalEntry {
   id: string;
@@ -84,48 +98,86 @@ export interface CommunityPost {
   createdAt: string;
 }
 export interface CommunityComment {
-    id: string;
-    postId: string;
-    userId: string;
-    userName: string;
-    content: string;
-    createdAt: string;
-    replyToId?: string; // ID of the comment being replied to (optional)
-    likes: number;
+  id: string;
+  postId: string;
+  userId: string;
+  userName: string;
+  content: string;
+  createdAt: string;
+  replyToId?: string; // ID of the comment being replied to (optional)
+  likes: number;
 }
 export const PLAN_FEATURES = {
   [PlanTier.BASIC]: {
     maxTasksPerDay: 5,
     maxRoutines: 2,
     statsHistory: 7, // days
-    storage: '1 mês',
-    support: 'E-mail (48h)',
+    storage: "1 mês",
+    support: "E-mail (48h)",
     canExportPDF: false,
     hasPomodoro: false,
     hasClasses: false,
-    hasJournal: false
+    hasJournal: false,
   },
   [PlanTier.PRO]: {
     maxTasksPerDay: Infinity,
     maxRoutines: Infinity,
     statsHistory: 30,
-    storage: '6 meses',
-    support: 'WhatsApp + E-mail',
+    storage: "6 meses",
+    support: "WhatsApp + E-mail",
     canExportPDF: false,
     hasPomodoro: true,
     hasClasses: true,
-    hasJournal: false
+    hasJournal: false,
   },
   [PlanTier.PREMIUM]: {
     maxTasksPerDay: Infinity,
     maxRoutines: Infinity,
     statsHistory: Infinity,
-    storage: 'Permanente',
-    support: 'Prioritário WhatsApp',
+    storage: "Permanente",
+    support: "Prioritário WhatsApp",
     canExportPDF: true,
     hasPomodoro: true,
     hasClasses: true,
     hasJournal: true, // Includes auto-evaluation
-    hasReports: true
-  }
+    hasReports: true,
+  },
 };
+
+// --- Dashboard (NEW) ---
+export type PeriodOption = "Hoje" | "Ontem" | "Semana" | "Mês" | "Sempre";
+
+// types.ts
+export const WEEK_DAYS = [
+  "Seg",
+  "Ter",
+  "Qua",
+  "Qui",
+  "Sex",
+  "Sab",
+  "Dom",
+] as const;
+export type WeekDay = (typeof WEEK_DAYS)[number];
+
+export type WeeklyPoint = {
+  day: WeekDay;
+  value: number;
+};
+
+export interface DashboardMetrics {
+  /** % de itens concluídos no período selecionado */
+  consistencyPct: number;
+  /** micro-passos concluídos (tasks concluídas + steps concluídos) */
+  completedItems: number;
+  /** micro-passos totais (tasks + steps) */
+  totalItems: number;
+  /** série para o gráfico de área do resumo semanal */
+  weeklyConsistencyData: WeeklyPoint[];
+  /** breakdown por “rotinas”/categorias mostrado na listinha da direita */
+  breakdown: {
+    morning?: number;
+    afternoon?: number;
+    night?: number;
+    [k: string]: number | undefined;
+  };
+}
