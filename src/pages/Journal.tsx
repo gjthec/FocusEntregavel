@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { DataService } from "../services/dataService";
 import { AuthService } from "../services/authService";
-import { JournalEntry, MoodType } from "../../../FocusProBackend/src/types";
+import { JournalEntry, MoodType } from "../types";
 import {
   Save,
   Calendar,
