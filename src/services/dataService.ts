@@ -26,10 +26,14 @@ export const DataService = {
     }));
   },
 
-  updateUserPlan: async (userId: string, plan: PlanTier) => {
+  updateUserPlanAndRole: async (
+    userId: string,
+    plan: PlanTier,
+    role: UserRole
+  ) => {
     const { error } = await supabase
       .from("profiles")
-      .update({ plan })
+      .update({ plan, role })
       .eq("id", userId);
     if (error) throw error;
   },

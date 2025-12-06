@@ -1,4 +1,4 @@
-import { User } from "../types";
+import { PlanTier, User, UserRole } from "../types";
 import { supabase } from "./supabase";
 
 export const AuthService = {
@@ -51,7 +51,9 @@ export const AuthService = {
   register: async (
     email: string,
     password: string,
-    name: string
+    name: string,
+    role: UserRole = UserRole.USER,
+    plan: PlanTier = PlanTier.BASIC
   ): Promise<void> => {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -68,8 +70,8 @@ export const AuthService = {
         id: data.user.id,
         email: email,
         name: name,
-        role: "USER",
-        plan: "Basic",
+        role,
+        plan,
       });
     }
   },
