@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase, supabaseAdmin } from "./supabase";
 import {
   User,
   Task,
@@ -14,8 +14,17 @@ import {
 export const DataService = {
   // --- USERS (Admin) ---
   getUsers: async (): Promise<User[]> => {
-    const { data, error } = await supabase.from("profiles").select("*");
-    if (error) throw error;
+    const client = supabaseAdmin || supabase;
+    const { data, error, status } = await client.from("profiles").select("*");
+    if (error) {
+      // Most common cause is missing service-role key while RLS is enabled
+      if (!supabaseAdmin && status === 403) {
+        throw new Error(
+          "A listagem de usuários requer a chave de service role (VITE_SUPABASE_SERVICE_ROLE_KEY) ou políticas RLS específicas para admins."
+        );
+      }
+      throw error;
+    }
     return data.map((p: any) => ({
       id: p.id,
       email: p.email,
@@ -26,17 +35,23 @@ export const DataService = {
     }));
   },
 
-  updateUserPlan: async (userId: string, plan: PlanTier) => {
-    const { error } = await supabase
+  updateUserPlanAndRole: async (
+    userId: string,
+    plan: PlanTier,
+    role: UserRole
+  ) => {
+    const client = supabaseAdmin || supabase;
+    const { error } = await client
       .from("profiles")
-      .update({ plan })
+      .update({ plan, role })
       .eq("id", userId);
     if (error) throw error;
   },
 
   deleteUser: async (userId: string) => {
     // Supabase cascade delete should handle relations if configured, otherwise delete manually
-    const { error } = await supabase.from("profiles").delete().eq("id", userId);
+    const client = supabaseAdmin || supabase;
+    const { error } = await client.from("profiles").delete().eq("id", userId);
     if (error) throw error;
   },
 
@@ -91,6 +106,32 @@ export const DataService = {
   },
 
   // --- ROUTINES ---
+  getRoutineById: async (routineId: string): Promise<Routine | null> => {
+    const { data, error } = await supabase
+      .from("routines")
+      .select("*")
+      .eq("id", routineId)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116" || error.details?.includes("0 rows")) {
+        return null;
+      }
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      title: data.title,
+      time: data.time,
+      category: data.category,
+      frequency: data.frequency || [],
+      steps: data.steps || [],
+      completed: data.completed,
+    };
+  },
+
   getRoutines: async (userId: string): Promise<Routine[]> => {
     const { data, error } = await supabase
       .from("routines")
@@ -370,6 +411,34 @@ export const DataService = {
       .delete()
       .eq("id", commentId);
     if (error) throw error;
+  },
+  getCourseModulesWithLessons: async () => {
+    const { data, error } = await supabase
+      .from("course_modules")
+      .select(
+        `
+        id,
+        title,
+        description,
+        duration,
+        locked,
+        icon,
+        sort_order,
+        lessons (
+          id,
+          title,
+          duration,
+          type,
+          youtube_url,
+          order_index
+        )
+      `
+      )
+      .order("sort_order", { ascending: true })
+      .order("order_index", { foreignTable: "lessons", ascending: true });
+
+    if (error) throw error;
+    return data;
   },
 
   getLessonRating: async (lessonId: string, userId: string) => {

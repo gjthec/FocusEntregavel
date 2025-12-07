@@ -177,7 +177,18 @@ export const Journal: React.FC = () => {
 
   // --- HELPERS ---
 
-  const getMoodConfig = (type: MoodType) => MOODS.find((m) => m.type === type)!;
+  const DEFAULT_MOOD = {
+    type: "neutral" as const,
+    emoji: "😐",
+    label: "Neutro",
+    color:
+      "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600",
+    category: "neutral" as const,
+    score: 3,
+  };
+
+  const getMoodConfig = (type: MoodType) =>
+    MOODS.find((m) => m.type === type) ?? DEFAULT_MOOD;
 
   const handleReasonToggle = (reason: string) => {
     setSelectedReasons((prev) =>
@@ -271,24 +282,73 @@ export const Journal: React.FC = () => {
   };
 
   const getAutoEvaluation = () => {
-    const recent = entries.slice(0, 10);
-    if (recent.length === 0) return null;
+    if (!entries.length) return null;
 
-    const goodDays = recent.filter((e) =>
-      ["great", "good"].includes(e.mood)
-    ).length;
-    const badDays = recent.filter((e) =>
-      ["bad", "terrible"].includes(e.mood)
-    ).length;
+    // Últimos 7 dias (inclui hoje)
+    const now = new Date();
+    const weekStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 6
+    );
 
-    const allReasons = recent.flatMap((e) => e.reasons);
-    const topReason = allReasons
-      .sort(
-        (a, b) =>
-          allReasons.filter((v) => v === a).length -
-          allReasons.filter((v) => v === b).length
-      )
-      .pop();
+    // Helper: chave local YYYY-MM-DD
+    const dayKey = (d: Date) => {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    // Mapa de score por mood
+    const moodScore: Record<MoodType, number> = MOODS.reduce((acc, m) => {
+      acc[m.type] = m.score;
+      return acc;
+    }, {} as Record<MoodType, number>);
+
+    // Filtra semana e agrupa por dia
+    const byDay: Record<
+      string,
+      { sum: number; count: number; reasons: string[] }
+    > = {};
+
+    entries.forEach((e) => {
+      const d = new Date(e.date);
+      if (d >= weekStart && d <= now) {
+        const key = dayKey(d);
+        if (!byDay[key]) byDay[key] = { sum: 0, count: 0, reasons: [] };
+        byDay[key].sum += moodScore[e.mood as MoodType] ?? 3;
+        byDay[key].count += 1;
+        if (Array.isArray(e.reasons)) byDay[key].reasons.push(...e.reasons);
+      }
+    });
+
+    const dayKeys = Object.keys(byDay);
+    if (!dayKeys.length) return null;
+
+    // Classifica por média do dia
+    let goodDays = 0;
+    let badDays = 0;
+
+    // Limiares: >3 positivo, <3 negativo, =3 neutro
+    dayKeys.forEach((k) => {
+      const avg = byDay[k].sum / byDay[k].count;
+      if (avg > 3) goodDays += 1;
+      else if (avg < 3) badDays += 1;
+    });
+
+    // Motivo mais frequente na semana
+    const allReasonsWeek = dayKeys.flatMap((k) => byDay[k].reasons);
+    const topReason =
+      allReasonsWeek.length === 0
+        ? null
+        : allReasonsWeek
+            .sort(
+              (a, b) =>
+                allReasonsWeek.filter((v) => v === a).length -
+                allReasonsWeek.filter((v) => v === b).length
+            )
+            .pop() ?? null;
 
     return { goodDays, badDays, topReason };
   };

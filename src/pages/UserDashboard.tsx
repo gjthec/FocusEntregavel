@@ -60,6 +60,9 @@ import {
   CartesianGrid,
 } from "recharts";
 
+// --- DASHBOARD METRICS (Supabase) ---
+import { useDashboardMetrics } from "../hooks/userDashboardMetrics";
+
 // --- CONSTANTS FOR MOOD ---
 const MOTIVATIONAL_QUOTES = [
   "Respira. Você não precisa resolver tudo hoje. Um passo já conta.",
@@ -179,10 +182,21 @@ export const UserDashboard: React.FC = () => {
   const [showMoodModal, setShowMoodModal] = useState(false);
   const [moodModalQuote, setMoodModalQuote] = useState("");
 
+  // Routine load indicator
+  const [loadingRoutineId, setLoadingRoutineId] = useState<string | null>(null);
+
   const POMODORO_TIME = 25 * 60;
 
-  // --- Weekly Summary Mock Data ---
-  const [periodFilter, setPeriodFilter] = useState("Semana");
+  // Filtro e métricas do dashboard (AGORA dentro do componente)
+  const [periodFilter, setPeriodFilter] = useState<
+    "Hoje" | "Ontem" | "Semana" | "Mês" | "Sempre"
+  >("Semana");
+  const {
+    metrics,
+    loading: loadingMetrics,
+    refresh,
+  } = useDashboardMetrics(user?.id ?? null, periodFilter);
+
   const weeklyConsistencyData = [
     { day: "Seg", value: 45 },
     { day: "Ter", value: 72 },
@@ -287,6 +301,7 @@ export const UserDashboard: React.FC = () => {
   const features = user
     ? PLAN_FEATURES[user.plan]
     : PLAN_FEATURES[PlanTier.BASIC];
+
   const activeTasksCount = tasks.filter(
     (t) => t.status !== "completed" && t.status !== "canceled"
   ).length;
@@ -339,6 +354,7 @@ export const UserDashboard: React.FC = () => {
     setTasks((prev) => [newTask, ...prev]); // Optimistic Update
     try {
       await DataService.addTask(newTask);
+      refresh();
     } catch (err) {
       console.error("Failed to add task", err);
     }
@@ -358,6 +374,7 @@ export const UserDashboard: React.FC = () => {
 
     try {
       await DataService.updateTask(updated);
+      refresh();
     } catch (err) {
       console.error("Failed to update task", err);
     }
@@ -376,6 +393,7 @@ export const UserDashboard: React.FC = () => {
     setTasks(tasks.filter((t) => t.id !== id)); // Optimistic
     try {
       await DataService.deleteTask(id);
+      refresh();
     } catch (err) {
       console.error("Failed delete", err);
     }
@@ -459,6 +477,7 @@ export const UserDashboard: React.FC = () => {
 
     try {
       await DataService.addRoutine(r);
+      refresh();
     } catch (err) {
       console.error("Error saving routine", err);
     }
@@ -498,7 +517,10 @@ export const UserDashboard: React.FC = () => {
 
         // Persist generated routines
         for (const r of mappedRoutines) {
-          await DataService.addRoutine(r);
+          for (const r of mappedRoutines) {
+            await DataService.addRoutine(r);
+          }
+          refresh();
         }
         alert("Rotinas criadas com sucesso pela IA!");
       }
@@ -525,6 +547,7 @@ export const UserDashboard: React.FC = () => {
 
     try {
       await DataService.updateRoutine(updatedRoutine);
+      refresh();
     } catch (err) {
       console.error("Error updating routine", err);
     }
@@ -536,8 +559,29 @@ export const UserDashboard: React.FC = () => {
     setSelectedRoutine(null);
     try {
       await DataService.deleteRoutine(id);
+      refresh();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const fetchAndSelectRoutine = async (routineId: string) => {
+    setLoadingRoutineId(routineId);
+    try {
+      const latestRoutine = await DataService.getRoutineById(routineId);
+      if (latestRoutine) {
+        setSelectedRoutine(latestRoutine);
+        setRoutines((prev) =>
+          prev.map((r) => (r.id === routineId ? latestRoutine : r))
+        );
+      } else {
+        setSelectedRoutine(routines.find((r) => r.id === routineId) || null);
+      }
+    } catch (error) {
+      console.error("Error loading routine details", error);
+      setSelectedRoutine(routines.find((r) => r.id === routineId) || null);
+    } finally {
+      setLoadingRoutineId(null);
     }
   };
 
@@ -550,6 +594,8 @@ export const UserDashboard: React.FC = () => {
   // ... Render Helpers (getCategoryIcon, getCategoryLabel, etc. same as before) ...
   const getCategoryIcon = (cat: string) => {
     switch (cat) {
+      case "afternoon":
+        return <Sun size={18} className="text-orange-500" />; // ou outro ícone
       case "morning":
         return <Sun size={18} className="text-amber-500" />;
       case "night":
@@ -569,6 +615,8 @@ export const UserDashboard: React.FC = () => {
 
   const getCategoryLabel = (cat: string) => {
     switch (cat) {
+      case "afternoon":
+        return "Tarde";
       case "morning":
         return "Manhã";
       case "night":
@@ -846,7 +894,7 @@ export const UserDashboard: React.FC = () => {
                   >
                     <div
                       className="p-3 bg-white dark:bg-slate-800 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700"
-                      onClick={() => setSelectedRoutine(routine)}
+                      onClick={() => fetchAndSelectRoutine(routine.id)}
                     >
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400">
@@ -871,10 +919,17 @@ export const UserDashboard: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <ArrowRight
-                        size={16}
-                        className="text-slate-300 dark:text-slate-600"
-                      />
+                      {loadingRoutineId === routine.id ? (
+                        <Loader2
+                          className="animate-spin text-blue-500"
+                          size={16}
+                        />
+                      ) : (
+                        <ArrowRight
+                          size={16}
+                          className="text-slate-300 dark:text-slate-600"
+                        />
+                      )}
                     </div>
                     <div className="h-1 w-full bg-slate-100 dark:bg-slate-700">
                       <div
@@ -930,14 +985,30 @@ export const UserDashboard: React.FC = () => {
                     Consistência da Semana
                   </p>
                   <h2 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 tracking-tight">
-                    68%
+                    {loadingMetrics
+                      ? "…"
+                      : `${metrics?.consistencyPercent ?? 0}%`}
                   </h2>
                 </div>
               </div>
 
               <div className="h-56 w-full mb-8 -ml-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={weeklyConsistencyData}>
+                  <AreaChart
+                    data={
+                      (metrics?.weeklySeries?.length ?? 0) > 0
+                        ? metrics!.weeklySeries
+                        : [
+                            { day: "Seg", value: 0 },
+                            { day: "Ter", value: 0 },
+                            { day: "Qua", value: 0 },
+                            { day: "Qui", value: 0 },
+                            { day: "Sex", value: 0 },
+                            { day: "Sab", value: 0 },
+                            { day: "Dom", value: 0 },
+                          ]
+                    }
+                  >
                     <defs>
                       <linearGradient
                         id="strokeGradient"
@@ -1036,8 +1107,11 @@ export const UserDashboard: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-xl font-bold text-slate-800 dark:text-white">
-                    12/dia
+                    {loadingMetrics
+                      ? "…"
+                      : `${Math.round(metrics?.dailyAverage ?? 0)}/dia`}
                   </div>
+
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
                     Média Diária
                   </div>
@@ -1053,25 +1127,38 @@ export const UserDashboard: React.FC = () => {
                     Status
                   </span>
                 </div>
+
                 <div className="space-y-1">
-                  <div className="flex justify-between items-center p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                      Rotina Matinal
-                    </div>
-                    <div className="text-xs font-bold text-green-500">92%</div>
-                  </div>
-                  <div className="flex justify-between items-center p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                      Rotina da Tarde
-                    </div>
-                    <div className="text-xs font-bold text-amber-500">45%</div>
-                  </div>
-                  <div className="flex justify-between items-center p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                      Rotina da Noite
-                    </div>
-                    <div className="text-xs font-bold text-blue-500">68%</div>
-                  </div>
+                  {[
+                    { key: "morning", label: "Rotina Matinal" },
+                    { key: "afternoon", label: "Rotina da Tarde" },
+                    { key: "night", label: "Rotina da Noite" },
+                  ].map(({ key, label }) => {
+                    const percent =
+                      metrics?.routineByCat?.[
+                        key as "morning" | "afternoon" | "night"
+                      ] ?? 0;
+                    const color =
+                      percent >= 80
+                        ? "text-green-500"
+                        : percent >= 50
+                        ? "text-amber-500"
+                        : "text-blue-500";
+
+                    return (
+                      <div
+                        key={key}
+                        className="flex justify-between items-center p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                      >
+                        <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                          {label}
+                        </div>
+                        <div className={`text-xs font-bold ${color}`}>
+                          {percent}%
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

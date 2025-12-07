@@ -36,7 +36,15 @@ import { PlanTier, UserRole, Comment } from "../types";
 import { AuthService } from "../services/authService";
 import { DataService } from "../services/dataService";
 
-// ... (Interfaces remain same) ...
+// ---- TIPOS ----
+interface Lesson {
+  id?: string;
+  title: string;
+  duration: string;
+  type: "video" | "pdf" | "audio" | "ebook";
+  youtubeUrl?: string;
+}
+
 interface Module {
   id: string;
   title: string;
@@ -44,11 +52,7 @@ interface Module {
   duration: string;
   locked: boolean;
   icon?: any;
-  lessons: {
-    title: string;
-    duration: string;
-    type: "video" | "pdf" | "audio" | "ebook";
-  }[];
+  lessons: Lesson[];
 }
 
 interface Material {
@@ -67,64 +71,15 @@ export const Resources: React.FC = () => {
     "classes"
   );
 
-  const [expandedModules, setExpandedModules] = useState<string[]>(["1"]);
+  const [modules, setModules] = useState<Module[]>([]);
+  const [expandedModules, setExpandedModules] = useState<string[]>([]);
   const [activeLesson, setActiveLesson] = useState<string | null>(null);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
 
-  // ... (Modules and Materials Constants same as original) ...
-  const modules: Module[] = [
-    {
-      id: "1",
-      title: "Módulo 1: Entendendo o Cérebro",
-      description:
-        "Entenda por que sua mente pula de pensamento em pensamento.",
-      duration: "40 min",
-      locked: false,
-      icon: Brain,
-      lessons: [
-        {
-          title: "O Mito da Preguiça vs. Biologia",
-          duration: "10:00",
-          type: "video",
-        },
-        {
-          title: "Atenção Plena vs. Atenção Seletiva",
-          duration: "15:00",
-          type: "video",
-        },
-        {
-          title: "Por que meu cérebro não para?",
-          duration: "15:00",
-          type: "video",
-        },
-      ],
-    },
-    // ... Add other modules here (omitted for brevity, assume original array)
-    {
-      id: "2",
-      title: "Módulo 2: O que é TDAH",
-      description: "Um guia simples e direto para entender os sinais comuns.",
-      duration: "45 min",
-      locked: false,
-      icon: Video,
-      lessons: [
-        {
-          title: "Sinais Invisíveis do TDAH Adulto",
-          duration: "12:00",
-          type: "video",
-        },
-        {
-          title: "Hiperatividade Mental vs. Física",
-          duration: "18:00",
-          type: "video",
-        },
-        { title: "Diagnóstico e Aceitação", duration: "15:00", type: "audio" },
-      ],
-    },
-    // ... (keeping structure)
-  ];
+  const [loadingModules, setLoadingModules] = useState(true);
 
+  // MATERIAIS AINDA HARDCODEADOS (pode jogar pro banco depois se quiser)
   const materials: Material[] = [
     {
       id: "m1",
@@ -142,8 +97,48 @@ export const Resources: React.FC = () => {
       description: "Template visual para organizar sua semana.",
       premiumOnly: false,
     },
-    // ... (keeping structure)
+    // ... (mantém estrutura)
   ];
+
+  // --------- CARREGAR MÓDULOS + AULAS DO BANCO ---------
+  useEffect(() => {
+    const loadModules = async () => {
+      try {
+        const data = await DataService.getCourseModulesWithLessons();
+        // data vem do Supabase com: id, title, description, duration, locked, icon, lessons[]
+        const mapped: Module[] = (data || []).map((m: any) => ({
+          id: m.id,
+          title: m.title,
+          description: m.description,
+          duration: m.duration,
+          locked: m.locked,
+          // Se quiser mapear string de ícone -> componente:
+          icon: Brain, // por enquanto usa Brain pra todos, depois dá pra mapear por m.icon
+          lessons: (m.lessons || []).map((l: any) => ({
+            id: l.id,
+            title: l.title,
+            duration: l.duration,
+            type: l.type,
+            youtubeUrl: l.youtube_url,
+          })),
+        }));
+
+        setModules(mapped);
+
+        // Abre o primeiro módulo e seleciona a primeira aula automaticamente
+        if (mapped.length > 0 && mapped[0].lessons.length > 0) {
+          setExpandedModules([mapped[0].id]);
+          setActiveLesson(mapped[0].lessons[0].title);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar módulos:", err);
+      } finally {
+        setLoadingModules(false);
+      }
+    };
+
+    loadModules();
+  }, []);
 
   const toggleModule = (moduleId: string) => {
     if (expandedModules.includes(moduleId)) {
@@ -216,7 +211,8 @@ export const Resources: React.FC = () => {
 
   const totalLessons = modules.reduce((acc, m) => acc + m.lessons.length, 0);
   const completedCount = completedLessons.length;
-  const progressPercentage = Math.round((completedCount / totalLessons) * 100);
+  const progressPercentage =
+    totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
   // --- SUB-COMPONENTS WITH ASYNC DATA ---
 
@@ -384,18 +380,11 @@ export const Resources: React.FC = () => {
             >
               <Star
                 size={20}
-                className={`
-                                  transition-colors duration-200 
-                                  ${
-                                    (
-                                      hoverRating
-                                        ? star <= hoverRating
-                                        : star <= stats.userRating
-                                    )
-                                      ? "fill-amber-400 text-amber-400 drop-shadow-sm"
-                                      : "text-slate-300 dark:text-slate-600"
-                                  }
-                              `}
+                className={`transition-colors duration-200 ${
+                  (hoverRating ? star <= hoverRating : star <= stats.userRating)
+                    ? "fill-amber-400 text-amber-400 drop-shadow-sm"
+                    : "text-slate-300 dark:text-slate-600"
+                }`}
               />
             </button>
           ))}
@@ -410,12 +399,12 @@ export const Resources: React.FC = () => {
     );
   };
 
-  // VideoPlayer and PdfViewer components remain mostly the same (UI only)
+  // VideoPlayer e PdfViewer (aqui você pode usar youtubeUrl depois se quiser embutir o iframe)
   const VideoPlayer = ({
     lesson,
     onComplete,
   }: {
-    lesson: any;
+    lesson: Lesson;
     onComplete: () => void;
   }) => {
     const [playing, setPlaying] = useState(false);
@@ -455,15 +444,10 @@ export const Resources: React.FC = () => {
               onClick={() => setPlaying(true)}
               className="absolute z-10 bg-blue-600/90 hover:bg-blue-500 backdrop-blur-md rounded-full p-6 transition-all transform hover:scale-110 shadow-xl shadow-blue-900/20"
             >
-              {progress > 0 ? (
-                <Play size={48} fill="white" className="ml-1" />
-              ) : (
-                <Play size={48} fill="white" className="ml-1" />
-              )}
+              <Play size={48} fill="white" className="ml-1" />
             </button>
           )}
         </div>
-        {/* Controls UI Omitted for brevity, kept same as original */}
         <div
           className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-6 transition-opacity duration-300 ${
             playing ? "opacity-0 group-hover:opacity-100" : "opacity-100"
@@ -488,7 +472,7 @@ export const Resources: React.FC = () => {
     );
   };
 
-  const PdfViewer = ({ lesson }: { lesson: any }) => {
+  const PdfViewer = ({ lesson }: { lesson: Lesson }) => {
     return (
       <div className="bg-slate-100 dark:bg-slate-900/50 rounded-2xl p-8 min-h-[400px] md:h-[600px] flex flex-col items-center justify-center border border-slate-200 dark:border-slate-700 relative shadow-inner">
         <div className="text-slate-400">
@@ -505,7 +489,6 @@ export const Resources: React.FC = () => {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 pb-12 min-h-[calc(100vh-6rem)] lg:h-[calc(100vh-6rem)] flex flex-col font-sans">
-      {/* Header and Layout structure same as original, just re-rendering to ensure closure scope */}
       <div className="flex-shrink-0">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
           <div>
@@ -542,11 +525,18 @@ export const Resources: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content Area */}
       {activeTab === "classes" ? (
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-8 min-h-0 relative">
           <div className="md:col-span-7 lg:col-span-8 flex flex-col h-full lg:overflow-y-auto pr-0 lg:pr-2 scrollbar-thin">
-            {currentInfo ? (
+            {loadingModules ? (
+              <div className="text-center p-8 text-slate-400">
+                Carregando aulas...
+              </div>
+            ) : !currentInfo ? (
+              <div className="text-center p-8 text-slate-400">
+                Selecione uma aula para começar.
+              </div>
+            ) : (
               <div className="space-y-6">
                 <div className="rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700">
                   {currentInfo.lesson.type === "video" ||
@@ -572,10 +562,6 @@ export const Resources: React.FC = () => {
                   <LessonComments lessonTitle={currentInfo.lesson.title} />
                 </div>
               </div>
-            ) : (
-              <div className="text-center p-8 text-slate-400">
-                Selecione uma aula para começar.
-              </div>
             )}
           </div>
 
@@ -586,7 +572,6 @@ export const Resources: React.FC = () => {
                 : "hidden md:flex"
             }`}
           >
-            {/* Module List Logic from Original File */}
             <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-full shadow-lg">
               <div className="overflow-y-auto flex-1 p-2">
                 {modules.map((module) => (
@@ -601,7 +586,7 @@ export const Resources: React.FC = () => {
                       <div className="pl-4">
                         {module.lessons.map((l, i) => (
                           <button
-                            key={i}
+                            key={l.id || i}
                             onClick={() => setActiveLesson(l.title)}
                             className="block p-2 text-sm text-slate-500 hover:text-blue-500"
                           >

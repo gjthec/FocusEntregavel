@@ -19,6 +19,7 @@ export const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPlan, setEditPlan] = useState<PlanTier>(PlanTier.BASIC);
+  const [editRole, setEditRole] = useState<UserRole>(UserRole.USER);
   const currentUser = AuthService.getCurrentUser();
 
   // Create User State
@@ -30,6 +31,7 @@ export const AdminDashboard: React.FC = () => {
     type: "success" | "error";
     msg: string;
   } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -39,8 +41,14 @@ export const AdminDashboard: React.FC = () => {
     try {
       const data = await DataService.getUsers();
       setUsers(data);
+      setLoadError(null);
     } catch (err) {
       console.error(err);
+      setLoadError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao carregar usuários. Verifique a chave service role ou as políticas RLS."
+      );
     }
   };
 
@@ -51,7 +59,13 @@ export const AdminDashboard: React.FC = () => {
     // This implementation assumes a trigger handles profile creation or falls back to public insert.
     try {
       // Warning: This only registers auth. Logic for creating Profile with Plan/Role is in AuthService.register fallback
-      await AuthService.register(newUserEmail, "123456", newUserName);
+      await AuthService.register(
+        newUserEmail,
+        "123456",
+        newUserName,
+        newUserRole,
+        newUserPlan
+      );
 
       setCreateStatus({
         type: "success",
@@ -59,6 +73,8 @@ export const AdminDashboard: React.FC = () => {
       });
       setNewUserEmail("");
       setNewUserName("");
+      setNewUserPlan(PlanTier.BASIC);
+      setNewUserRole(UserRole.USER);
       loadUsers();
       setTimeout(() => setCreateStatus(null), 3000);
     } catch (err: any) {
@@ -87,13 +103,16 @@ export const AdminDashboard: React.FC = () => {
   const startEdit = (user: User) => {
     setEditingId(user.id);
     setEditPlan(user.plan);
+    setEditRole(user.role);
   };
 
   const saveEdit = async (userId: string) => {
     try {
-      await DataService.updateUserPlan(userId, editPlan);
+      await DataService.updateUserPlanAndRole(userId, editPlan, editRole);
       setUsers(
-        users.map((u) => (u.id === userId ? { ...u, plan: editPlan } : u))
+        users.map((u) =>
+          u.id === userId ? { ...u, plan: editPlan, role: editRole } : u
+        )
       );
       setEditingId(null);
     } catch (err) {
@@ -126,6 +145,23 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
+  const RoleBadge = ({ role }: { role: UserRole }) => {
+    const colors = {
+      [UserRole.ADMIN]:
+        "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300",
+      [UserRole.USER]:
+        "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300",
+    };
+
+    return (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${colors[role]}`}
+      >
+        {role}
+      </span>
+    );
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -137,6 +173,11 @@ export const AdminDashboard: React.FC = () => {
           <p className="text-slate-500 dark:text-slate-400">
             Gerenciar usuários e assinaturas.
           </p>
+          {loadError && (
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+              {loadError}
+            </p>
+          )}
         </div>
         <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-2 w-full md:w-64 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
           <Search size={20} className="text-slate-400" />
@@ -253,6 +294,9 @@ export const AdminDashboard: React.FC = () => {
                   E-mail
                 </th>
                 <th className="p-4 font-semibold text-slate-600 dark:text-slate-300 text-sm">
+                  Função
+                </th>
+                <th className="p-4 font-semibold text-slate-600 dark:text-slate-300 text-sm">
                   Data de Entrada
                 </th>
                 <th className="p-4 font-semibold text-slate-600 dark:text-slate-300 text-sm">
@@ -284,6 +328,22 @@ export const AdminDashboard: React.FC = () => {
                     </td>
                     <td className="p-4 text-slate-600 dark:text-slate-300">
                       {user.email}
+                    </td>
+                    <td className="p-4">
+                      {editingId === user.id ? (
+                        <select
+                          value={editRole}
+                          onChange={(e) =>
+                            setEditRole(e.target.value as UserRole)
+                          }
+                          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1 text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+                        >
+                          <option value={UserRole.USER}>Usuário</option>
+                          <option value={UserRole.ADMIN}>Administrador</option>
+                        </select>
+                      ) : (
+                        <RoleBadge role={user.role} />
+                      )}
                     </td>
                     <td className="p-4 text-slate-500 dark:text-slate-400 text-sm">
                       {new Date(user.joinedDate).toLocaleDateString()}
@@ -330,7 +390,7 @@ export const AdminDashboard: React.FC = () => {
                               <button
                                 onClick={() => startEdit(user)}
                                 className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                                title="Editar Plano"
+                                title="Editar Plano e Função"
                               >
                                 <Edit size={18} />
                               </button>
