@@ -35,6 +35,9 @@ import {
 import { PlanTier, UserRole, Comment } from "../types";
 import { AuthService } from "../services/authService";
 import { DataService } from "../services/dataService";
+import { LessonComments } from "../components/LessonComments";
+import { LessonRating } from "../components/LessonRating";
+import VideoPlayer from "../components/VideoPlayer";
 
 // ---- TIPOS ----
 interface Lesson {
@@ -73,7 +76,7 @@ export const Resources: React.FC = () => {
 
   const [modules, setModules] = useState<Module[]>([]);
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
-  const [activeLesson, setActiveLesson] = useState<string | null>(null);
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
 
@@ -128,7 +131,7 @@ export const Resources: React.FC = () => {
         // Abre o primeiro módulo e seleciona a primeira aula automaticamente
         if (mapped.length > 0 && mapped[0].lessons.length > 0) {
           setExpandedModules([mapped[0].id]);
-          setActiveLesson(mapped[0].lessons[0].title);
+          setActiveLessonId(mapped[0].lessons[0].id!);
         }
       } catch (err) {
         console.error("Erro ao carregar módulos:", err);
@@ -149,10 +152,10 @@ export const Resources: React.FC = () => {
   };
 
   const getCurrentLessonInfo = () => {
-    if (!activeLesson) return null;
+    if (!activeLessonId) return null;
     for (let mIdx = 0; mIdx < modules.length; mIdx++) {
       const lIdx = modules[mIdx].lessons.findIndex(
-        (l) => l.title === activeLesson
+        (l) => l.id === activeLessonId
       );
       if (lIdx !== -1) {
         return {
@@ -165,7 +168,6 @@ export const Resources: React.FC = () => {
     }
     return null;
   };
-
   const toggleLessonCompletion = (lessonTitle: string) => {
     setCompletedLessons((prev) =>
       prev.includes(lessonTitle)
@@ -181,29 +183,32 @@ export const Resources: React.FC = () => {
 
     if (direction === "prev") {
       if (lIdx > 0) {
-        setActiveLesson(module.lessons[lIdx - 1].title);
+        setActiveLessonId(module.lessons[lIdx - 1].id!);
       } else if (mIdx > 0) {
         const prevModule = modules[mIdx - 1];
-        if (!prevModule.locked) {
-          setActiveLesson(
-            prevModule.lessons[prevModule.lessons.length - 1].title
+        if (!prevModule.locked && prevModule.lessons.length) {
+          setActiveLessonId(
+            prevModule.lessons[prevModule.lessons.length - 1].id!
           );
-          if (!expandedModules.includes(prevModule.id))
+          if (!expandedModules.includes(prevModule.id)) {
             setExpandedModules([...expandedModules, prevModule.id]);
+          }
         }
       }
     } else {
       if (lIdx < module.lessons.length - 1) {
-        setActiveLesson(module.lessons[lIdx + 1].title);
+        setActiveLessonId(module.lessons[lIdx + 1].id!);
       } else if (mIdx < modules.length - 1) {
         const nextModule = modules[mIdx + 1];
-        if (!nextModule.locked) {
-          setActiveLesson(nextModule.lessons[0].title);
-          if (!expandedModules.includes(nextModule.id))
+        if (!nextModule.locked && nextModule.lessons.length) {
+          setActiveLessonId(nextModule.lessons[0].id!);
+          if (!expandedModules.includes(nextModule.id)) {
             setExpandedModules([...expandedModules, nextModule.id]);
+          }
         }
       }
     }
+
     if (window.innerWidth < 1024) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -213,264 +218,6 @@ export const Resources: React.FC = () => {
   const completedCount = completedLessons.length;
   const progressPercentage =
     totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
-
-  // --- SUB-COMPONENTS WITH ASYNC DATA ---
-
-  const LessonComments = ({ lessonTitle }: { lessonTitle: string }) => {
-    const [comments, setComments] = useState<Comment[]>([]);
-    const [newComment, setNewComment] = useState("");
-
-    useEffect(() => {
-      DataService.getLessonComments(lessonTitle).then(setComments);
-      setNewComment("");
-    }, [lessonTitle]);
-
-    const handlePost = async () => {
-      if (!newComment.trim() || !user) return;
-      try {
-        const comment = await DataService.addLessonComment(
-          lessonTitle,
-          user.id,
-          user.name,
-          newComment
-        );
-        setComments([comment, ...comments]);
-        setNewComment("");
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
-    const handleDelete = async (id: string) => {
-      if (window.confirm("Tem certeza que deseja excluir este comentário?")) {
-        setComments(comments.filter((c) => c.id !== id));
-        try {
-          await DataService.deleteLessonComment(id);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    };
-
-    return (
-      <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-700/50 animate-in fade-in slide-in-from-bottom-2">
-        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-          <MessageSquare size={20} className="text-blue-500" />
-          Dúvidas e Comentários
-        </h3>
-        <div className="flex gap-4 mb-8">
-          <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold flex-shrink-0">
-            {user?.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1">
-            <div className="relative">
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Escreva um comentário ou dúvida..."
-                className="w-full p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm text-slate-700 dark:text-slate-200 h-24 transition-all"
-              />
-              <button
-                onClick={handlePost}
-                disabled={!newComment.trim()}
-                className="absolute bottom-3 right-3 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 transition-colors"
-              >
-                <Send size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {comments.length === 0 ? (
-            <p className="text-slate-400 text-center text-sm italic py-4">
-              Seja o primeiro a comentar nesta aula!
-            </p>
-          ) : (
-            comments.map((comment) => {
-              const isAuthor = user?.id === comment.userId;
-              const isAdmin = user?.role === UserRole.ADMIN;
-              const date = new Date(comment.createdAt);
-
-              return (
-                <div key={comment.id} className="flex gap-4 group">
-                  <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-300 flex-shrink-0">
-                    <UserIcon size={20} />
-                  </div>
-                  <div className="flex-1 bg-slate-50/50 dark:bg-slate-700/20 p-4 rounded-xl border border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600 transition-colors">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800 dark:text-white">
-                          {comment.userName}
-                        </h4>
-                        <span className="text-xs text-slate-400">
-                          {date.toLocaleDateString()} às{" "}
-                          {date.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-                      {(isAuthor || isAdmin) && (
-                        <button
-                          onClick={() => handleDelete(comment.id)}
-                          className="text-slate-400 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-all"
-                          title="Excluir comentário"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
-                      {comment.content}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const LessonRating = ({ lessonTitle }: { lessonTitle: string }) => {
-    const [hoverRating, setHoverRating] = useState(0);
-    const [stats, setStats] = useState({ average: 0, count: 0, userRating: 0 });
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-      if (!user) return;
-      DataService.getLessonRating(lessonTitle, user.id).then((data) => {
-        setStats(data);
-        setIsLoading(false);
-      });
-      setHoverRating(0);
-    }, [lessonTitle, user]);
-
-    const handleRate = async (rating: number) => {
-      if (!user) return;
-      try {
-        const newStats = await DataService.rateLesson(
-          lessonTitle,
-          user.id,
-          rating
-        );
-        setStats(newStats);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
-    if (isLoading)
-      return (
-        <div className="h-6 w-32 bg-slate-100 dark:bg-slate-700 rounded animate-pulse"></div>
-      );
-
-    return (
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              onMouseEnter={() => setHoverRating(star)}
-              onMouseLeave={() => setHoverRating(0)}
-              onClick={() => handleRate(star)}
-              className="focus:outline-none transition-transform hover:scale-110 active:scale-95"
-            >
-              <Star
-                size={20}
-                className={`transition-colors duration-200 ${
-                  (hoverRating ? star <= hoverRating : star <= stats.userRating)
-                    ? "fill-amber-400 text-amber-400 drop-shadow-sm"
-                    : "text-slate-300 dark:text-slate-600"
-                }`}
-              />
-            </button>
-          ))}
-        </div>
-        <div className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-          <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">
-            {stats.average.toFixed(1)}
-          </span>
-          <span>({stats.count} avaliações)</span>
-        </div>
-      </div>
-    );
-  };
-
-  // VideoPlayer e PdfViewer (aqui você pode usar youtubeUrl depois se quiser embutir o iframe)
-  const VideoPlayer = ({
-    lesson,
-    onComplete,
-  }: {
-    lesson: Lesson;
-    onComplete: () => void;
-  }) => {
-    const [playing, setPlaying] = useState(false);
-    const [progress, setProgress] = useState(0);
-    const [volume, setVolume] = useState(80);
-    const [speed, setSpeed] = useState(1);
-    const intervalRef = useRef<any>(null);
-
-    useEffect(() => {
-      if (playing && progress < 100) {
-        intervalRef.current = setInterval(() => {
-          setProgress((p) => {
-            const next = p + 0.5;
-            if (next >= 90 && p < 90) onComplete();
-            return next > 100 ? 100 : next;
-          });
-        }, 100);
-      } else {
-        clearInterval(intervalRef.current);
-      }
-      return () => clearInterval(intervalRef.current);
-    }, [playing, onComplete]);
-
-    useEffect(() => {
-      setProgress(0);
-      setPlaying(false);
-    }, [lesson.title]);
-
-    return (
-      <div className="bg-black rounded-2xl overflow-hidden shadow-2xl aspect-video relative group border border-slate-800">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
-          <div className="text-slate-700 dark:text-slate-600 text-9xl opacity-10 animate-pulse">
-            <Video size={120} />
-          </div>
-          {!playing && (
-            <button
-              onClick={() => setPlaying(true)}
-              className="absolute z-10 bg-blue-600/90 hover:bg-blue-500 backdrop-blur-md rounded-full p-6 transition-all transform hover:scale-110 shadow-xl shadow-blue-900/20"
-            >
-              <Play size={48} fill="white" className="ml-1" />
-            </button>
-          )}
-        </div>
-        <div
-          className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-6 transition-opacity duration-300 ${
-            playing ? "opacity-0 group-hover:opacity-100" : "opacity-100"
-          }`}
-        >
-          <div
-            className="w-full h-1.5 bg-white/20 rounded-full mb-4 cursor-pointer relative group/progress"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full relative"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-          <div className="flex items-center justify-between text-white">
-            <button onClick={() => setPlaying(!playing)}>
-              <Pause size={28} fill="currentColor" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const PdfViewer = ({ lesson }: { lesson: Lesson }) => {
     return (
@@ -542,11 +289,15 @@ export const Resources: React.FC = () => {
                   {currentInfo.lesson.type === "video" ||
                   currentInfo.lesson.type === "audio" ? (
                     <VideoPlayer
-                      lesson={currentInfo.lesson}
+                      lesson={{
+                        title: currentInfo.lesson.title,
+                        youtubeUrl: currentInfo.lesson.youtubeUrl, // já vem do banco
+                      }}
                       onComplete={() =>
                         !completedLessons.includes(currentInfo.lesson.title) &&
                         toggleLessonCompletion(currentInfo.lesson.title)
                       }
+                      autoPlay={true}
                     />
                   ) : (
                     <PdfViewer lesson={currentInfo.lesson} />
@@ -554,12 +305,22 @@ export const Resources: React.FC = () => {
                 </div>
                 <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
                   <div className="mb-4 pb-4 border-b border-slate-100 dark:border-slate-700/50">
-                    <LessonRating lessonTitle={currentInfo.lesson.title} />
+                    <LessonRating
+                      lessonId={currentInfo.lesson.id!}
+                      currentUserId={user?.id}
+                    />
                   </div>
                   <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
                     {currentInfo.lesson.title}
                   </h2>
-                  <LessonComments lessonTitle={currentInfo.lesson.title} />
+                  <LessonComments
+                    lessonId={currentInfo.lesson.id!}
+                    currentUser={
+                      user
+                        ? { id: user.id, name: user.name, role: user.role }
+                        : null
+                    }
+                  />
                 </div>
               </div>
             )}
@@ -587,7 +348,7 @@ export const Resources: React.FC = () => {
                         {module.lessons.map((l, i) => (
                           <button
                             key={l.id || i}
-                            onClick={() => setActiveLesson(l.title)}
+                            onClick={() => setActiveLessonId(l.id!)}
                             className="block p-2 text-sm text-slate-500 hover:text-blue-500"
                           >
                             {l.title}
