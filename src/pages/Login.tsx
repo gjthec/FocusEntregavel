@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthService } from "../services/authService";
 import { UserRole } from "../types";
@@ -13,7 +13,6 @@ import {
   Lock,
   LogIn,
 } from "lucide-react";
-import { ThemeContext } from "../App";
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -22,16 +21,6 @@ export const Login: React.FC = () => {
   const [error, setError] = useState("");
   const [showLogin, setShowLogin] = useState(false);
   const navigate = useNavigate();
-  const { theme } = useContext(ThemeContext);
-
-  // Ensure theme is applied on body for login page
-  useEffect(() => {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [theme]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();

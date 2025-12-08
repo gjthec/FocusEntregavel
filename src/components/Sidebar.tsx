@@ -1,8 +1,7 @@
-import React, { useContext } from "react";
+import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { User, UserRole, PlanTier } from "../types";
 import { AuthService } from "../services/authService";
-import { ThemeContext } from "../App";
 import {
   LayoutDashboard,
   Clock,
@@ -12,8 +11,6 @@ import {
   LogOut,
   Crown,
   BrainCircuit,
-  Sun,
-  Moon,
   X,
   Users, // Added icon
 } from "lucide-react";
@@ -26,7 +23,6 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
   const location = useLocation();
-  const { theme, toggleTheme } = useContext(ThemeContext);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -220,29 +216,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
 
         {/* Footer Actions */}
         <div className="p-3 border-t border-slate-100 dark:border-slate-700 space-y-1">
-          <button
-            onClick={toggleTheme}
-            className={`
-              flex items-center px-4 py-3 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors w-full rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800
-              md:justify-center md:group-hover:justify-start
-            `}
-            title={theme === "light" ? "Modo Escuro" : "Modo Claro"}
-          >
-            {theme === "light" ? (
-              <Moon size={22} className="flex-shrink-0" />
-            ) : (
-              <Sun size={22} className="flex-shrink-0" />
-            )}
-            <span
-              className={`
-              whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out
-              ml-3 md:ml-0 md:w-0 md:opacity-0 md:group-hover:w-auto md:group-hover:opacity-100 md:group-hover:ml-3
-            `}
-            >
-              {theme === "light" ? "Modo Escuro" : "Modo Claro"}
-            </span>
-          </button>
-
           <button
             onClick={AuthService.logout}
             className={`
