@@ -22,12 +22,10 @@ import { PlanTier, UserRole } from "./types";
 type Theme = "light" | "dark";
 interface ThemeContextType {
   theme: Theme;
-  toggleTheme: () => void;
 }
 
 export const ThemeContext = createContext<ThemeContextType>({
-  theme: "light",
-  toggleTheme: () => {},
+  theme: "dark",
 });
 
 const ProtectedRoute = ({
@@ -143,24 +141,13 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 };
 
 const App: React.FC = () => {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem("focuspro_theme");
-    return (saved as Theme) || "light";
-  });
+  const theme: Theme = "dark";
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     // Attempt to sync auth session on app load
     AuthService.refreshSession().finally(() => setAuthLoading(false));
   }, []);
-
-  const toggleTheme = () => {
-    setTheme((prev) => {
-      const newTheme = prev === "light" ? "dark" : "light";
-      localStorage.setItem("focuspro_theme", newTheme);
-      return newTheme;
-    });
-  };
 
   if (authLoading) {
     return (
@@ -171,7 +158,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme }}>
       <HashRouter>
         <Layout>
           <Routes>
