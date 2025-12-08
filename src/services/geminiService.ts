@@ -52,7 +52,7 @@ export const GeminiService = {
       const prompt = `
         Atue como um especialista em produtividade para pessoas com TDAH.
         Crie 3 a 5 rotinas diárias estruturadas baseadas nos dados abaixo.
-        
+
         Dados do Usuário:
         - Acorda às: ${wakeTime}
         - Dorme às: ${sleepTime}
@@ -61,16 +61,18 @@ export const GeminiService = {
         Regras:
         1. As rotinas devem ajudar na organização, evitando sobrecarga.
         2. Use categorias variadas: 'morning', 'afternoon', 'night', 'focus', 'health', 'productivity', 'emotional'.
-        3. Retorne APENAS um JSON válido (sem markdown \`\`\`json) no seguinte formato de array:
+        3. Cada rotina precisa de um "id" string único e todos os passos em "steps" também precisam de um "id" string único (ex.: "1", "2", "3").
+        4. Retorne APENAS um JSON válido (sem markdown \`\`\`json) no seguinte formato de array:
         [
           {
+            "id": "r1",
             "title": "Nome da Rotina",
             "time": "HH:MM",
             "category": "uma_das_categorias_acima",
             "frequency": ["Seg", "Ter", "Qua", "Qui", "Sex"],
             "steps": [
-              { "title": "Micro-passo 1", "completed": false },
-              { "title": "Micro-passo 2", "completed": false }
+              { "id": "s1", "title": "Micro-passo 1", "completed": false },
+              { "id": "s2", "title": "Micro-passo 2", "completed": false }
             ]
           }
         ]
@@ -91,7 +93,20 @@ export const GeminiService = {
         
         // Use new RegExp to avoid parser issues with backticks in regex literals
         const jsonStr = text.replace(new RegExp('```json', 'g'), '').replace(new RegExp('```', 'g'), '').trim();
-        return JSON.parse(jsonStr);
+        const parsed = JSON.parse(jsonStr);
+
+        if (!Array.isArray(parsed)) return parsed;
+
+        return parsed.map((routine, routineIdx) => ({
+          ...routine,
+          steps: Array.isArray(routine.steps)
+            ? routine.steps.map((step: any, stepIdx: number) => ({
+                ...step,
+                id: step?.id || `${routineIdx + 1}-${stepIdx + 1}`,
+                completed: !!step?.completed,
+              }))
+            : [],
+        }));
 
       } catch (e) {
         console.error("Erro ao gerar rotinas:", e);
