@@ -22,70 +22,6 @@ export const Login: React.FC = () => {
   const [showLogin, setShowLogin] = useState(false);
   const navigate = useNavigate();
 
-  const planStyles = {
-    premium: {
-      gradient: "linear-gradient(135deg, #ECD782 0%, #CBA753 45%, #A67C34 100%)",
-      accent: "#ECD782",
-      glow: "rgba(203, 167, 83, 0.45)",
-      shadow: "0 12px 40px rgba(166, 124, 52, 0.25)",
-      text: "text-amber-50",
-      surface: "#3b2c12",
-    },
-    pro: {
-      gradient: "linear-gradient(135deg, #46196F 0%, #7035A4 45%, #A762D7 100%)",
-      accent: "#A762D7",
-      glow: "rgba(112, 53, 164, 0.45)",
-      shadow: "0 12px 40px rgba(70, 25, 111, 0.28)",
-      text: "text-purple-50",
-      surface: "#2a153f",
-    },
-    basic: {
-      gradient:
-        "linear-gradient(135deg, #0F0F1C 0%, #052040 25%, #0E4B96 60%, #0066CC 85%, #42A3FF 100%)",
-      accent: "#42A3FF",
-      glow: "rgba(66, 163, 255, 0.55)",
-      shadow: "0 12px 40px rgba(5, 32, 64, 0.35)",
-      text: "text-blue-50",
-      surface: "#0b1120",
-    },
-  } as const;
-
-  const plans = [
-    {
-      key: "premium" as const,
-      title: "Premium",
-      subtitle: "Experiência completa com relatórios e diário inteligente.",
-      icon: "/Premium.png",
-      perks: [
-        "Relatórios avançados e exportação em PDF",
-        "Diário com autoavaliação inteligente",
-        "Suporte prioritário em tempo real",
-      ],
-    },
-    {
-      key: "pro" as const,
-      title: "Pro",
-      subtitle: "Para quem quer performance com aulas e modo foco.",
-      icon: "/Pro.png",
-      perks: [
-        "Pomodoro completo com métricas",
-        "Acesso às aulas e materiais exclusivos",
-        "Suporte por WhatsApp e e-mail",
-      ],
-    },
-    {
-      key: "basic" as const,
-      title: "Basic",
-      subtitle: "Organização essencial para começar agora mesmo.",
-      icon: "/Basic.png",
-      perks: [
-        "Rotinas essenciais e tarefas diárias",
-        "Histórico de 7 dias para métricas",
-        "Experiência leve para focar no básico",
-      ],
-    },
-  ];
-
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
@@ -136,15 +72,6 @@ export const Login: React.FC = () => {
     setTimeout(() => {
       document
         .getElementById("login-section")
-        ?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-  };
-
-  const scrollToPlans = () => {
-    setShowLogin(false);
-    setTimeout(() => {
-      document
-        .getElementById("plans-section")
         ?.scrollIntoView({ behavior: "smooth" });
     }, 100);
   };
@@ -208,7 +135,7 @@ export const Login: React.FC = () => {
               Acessar Plataforma <ArrowRight size={20} />
             </button>
             <button
-              onClick={scrollToPlans}
+              onClick={scrollToLogin}
               className="w-full sm:w-auto bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-blue-200 dark:hover:border-blue-700 text-slate-700 dark:text-slate-200 px-8 py-4 rounded-full font-bold text-lg transition-all"
             >
               Ver Planos
@@ -257,94 +184,6 @@ export const Login: React.FC = () => {
               <Heart /> MindCare
             </div>
           </div>
-
-          <section id="plans-section" className="mt-16 md:mt-24">
-            <div className="text-center max-w-3xl mx-auto mb-12">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-bold uppercase tracking-widest">
-                <Sparkles className="h-4 w-4" />
-                Nossos planos
-              </div>
-              <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white mt-4 mb-3">
-                Escolha o foco que brilha com você
-              </h2>
-              <p className="text-lg text-slate-500 dark:text-slate-400">
-                Cada plano vem com um ícone exclusivo — já na cor oficial — para você identificar rapidamente sua experiência no FocusPro.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plans.map((plan) => {
-                const style = planStyles[plan.key];
-                return (
-                  <div
-                    key={plan.key}
-                    className="relative rounded-3xl p-[1px] overflow-hidden"
-                    style={{
-                      background: style.gradient,
-                      boxShadow: style.shadow,
-                    }}
-                  >
-                    <div
-                      className="h-full rounded-[28px] p-6 md:p-7 flex flex-col gap-4 border border-white/10 bg-slate-900/70"
-                      style={{
-                        background: `${style.surface}cc`,
-                      }}
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="relative">
-                          <div
-                            className="absolute inset-0 rounded-2xl blur-2xl opacity-80"
-                            style={{ background: style.glow }}
-                          />
-                          <div
-                            className="relative w-12 h-12 rounded-2xl flex items-center justify-center border-2 shadow-lg"
-                            style={{
-                              background: style.surface,
-                              borderColor: style.accent,
-                              boxShadow: `${style.shadow}, 0 0 0 6px ${style.glow}`,
-                            }}
-                          >
-                            <img
-                              src={plan.icon}
-                              alt={`Ícone do plano ${plan.title}`}
-                              className="w-8 h-8 drop-shadow-lg"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <p className={`text-xs font-bold uppercase tracking-[0.2em] ${style.text}`}>
-                            Plano {plan.title}
-                          </p>
-                          <h3 className="text-2xl font-extrabold text-white leading-tight mt-1">
-                            {plan.subtitle}
-                          </h3>
-                        </div>
-                      </div>
-
-                      <ul className="space-y-2 text-sm text-slate-100/80">
-                        {plan.perks.map((perk) => (
-                          <li key={perk} className="flex items-start gap-2">
-                            <CheckCircle2 className="h-4 w-4 mt-0.5" style={{ color: style.accent }} />
-                            <span>{perk}</span>
-                          </li>
-                        ))}
-                      </ul>
-
-                      <div className="pt-2">
-                        <button
-                          onClick={scrollToLogin}
-                          className="w-full bg-white/10 hover:bg-white/20 text-white font-semibold py-3 rounded-2xl border border-white/20 backdrop-blur transition-colors"
-                          style={{ boxShadow: style.shadow }}
-                        >
-                          Começar com o plano {plan.title}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
         </div>
       ) : (
         /* Login / Register Section */

@@ -15,6 +15,71 @@ import {
   Users, // Added icon
 } from "lucide-react";
 
+const planStyles: Record<
+  PlanTier,
+  {
+    icon: string;
+    gradient: string;
+    glow: string;
+    accent: string;
+    halo: string;
+    textClass: string;
+  }
+> = {
+  [PlanTier.PREMIUM]: {
+    icon: "/Premium.png",
+    gradient: "linear-gradient(135deg, #ECD782 0%, #CBA753 45%, #A67C34 100%)",
+    glow: "0 12px 40px rgba(166, 124, 52, 0.35)",
+    accent: "#CBA753",
+    halo: "rgba(236, 215, 130, 0.35)",
+    textClass: "text-amber-950",
+  },
+  [PlanTier.PRO]: {
+    icon: "/Pro.png",
+    gradient: "linear-gradient(135deg, #46196F 0%, #7035A4 50%, #A762D7 100%)",
+    glow: "0 12px 40px rgba(70, 25, 111, 0.35)",
+    accent: "#7035A4",
+    halo: "rgba(167, 98, 215, 0.35)",
+    textClass: "text-purple-50",
+  },
+  [PlanTier.BASIC]: {
+    icon: "/Basic.png",
+    gradient: "linear-gradient(135deg, #0F0F1C 0%, #052040 30%, #0E4B96 60%, #0066CC 85%, #42A3FF 100%)",
+    glow: "0 12px 40px rgba(14, 75, 150, 0.35)",
+    accent: "#42A3FF",
+    halo: "rgba(66, 163, 255, 0.35)",
+    textClass: "text-blue-50",
+  },
+};
+
+const PlanBadge: React.FC<{ plan: PlanTier }> = ({ plan }) => {
+  const style = planStyles[plan];
+
+  return (
+    <div
+      className="relative rounded-xl overflow-hidden border border-white/30 dark:border-white/10 shadow-lg"
+      style={{ background: style.gradient, boxShadow: style.glow }}
+    >
+      <div
+        className="absolute inset-0 blur-2xl opacity-60"
+        style={{ background: `radial-gradient(circle at 25% 25%, ${style.halo}, transparent 55%)` }}
+      />
+      <div className="relative flex items-center gap-3 p-3">
+        <div
+          className="h-12 w-12 rounded-lg bg-white/90 p-2 shadow-inner"
+          style={{ boxShadow: `0 0 18px ${style.halo}, 0 0 0 2px ${style.accent}` }}
+        >
+          <img src={style.icon} alt={`${plan} icon`} className="h-full w-full object-contain" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/80">Plano</p>
+          <p className={`text-lg font-extrabold leading-tight ${style.textClass}`}>{plan}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface SidebarProps {
   user: User;
   isOpen: boolean;
@@ -145,13 +210,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
         <div
           className={`
           px-6 py-4 transition-all duration-300 overflow-hidden whitespace-nowrap
-          md:h-0 md:py-0 md:opacity-0 
+          md:h-0 md:py-0 md:opacity-0
           md:group-hover:h-auto md:group-hover:py-4 md:group-hover:opacity-100
         `}
         >
-          <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 text-center uppercase tracking-wide">
-            Plano {user.plan}
-          </div>
+          <PlanBadge plan={user.plan} />
         </div>
 
         {/* Navigation */}
