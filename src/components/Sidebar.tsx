@@ -66,7 +66,7 @@ const PlanBadge: React.FC<{ plan: PlanTier }> = ({ plan }) => {
       />
       <div className="relative flex items-center gap-3 p-3">
         <div
-          className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden"
+          className="h-12 w-12 flex-shrink-0 rounded-lg overflow-hidden"
         >
           <img
             src={style.icon}
