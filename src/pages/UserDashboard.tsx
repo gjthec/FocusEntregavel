@@ -142,7 +142,8 @@ const UrgencyBadge: React.FC<{
 }) => (
   <div
     aria-hidden="true"
-    className={`pointer-events-none absolute -top-3 -right-3 h-10 w-10 rounded-full bg-gradient-to-br ${gradient} text-white font-black text-lg flex items-center justify-center shadow-2xl ring-4 ${ring} drop-shadow-xl animate-[pulse_2.6s_ease-in-out_infinite] ${className}`}
+    className={`pointer-events-none absolute -top-5 -right-5 h-12 w-12 rounded-full bg-gradient-to-br ${gradient} text-white font-black text-lg flex items-center justify-center shadow-2xl ring-4 ${ring} drop-shadow-xl animate-[pulse_2.6s_ease-in-out_infinite] rotate-2 ${className}`}
+    style={{ filter: "drop-shadow(0 8px 18px rgba(0,0,0,0.35))" }}
   >
     {symbol}
   </div>
@@ -225,6 +226,7 @@ export const UserDashboard: React.FC = () => {
     { day: "Sab", value: 90 },
     { day: "Dom", value: 65 },
   ];
+
 
   // Async Load Data
   useEffect(() => {
@@ -341,6 +343,7 @@ export const UserDashboard: React.FC = () => {
   const completedItems = completedTasksCount + completedRoutineSteps;
   const progressPercentage =
     totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
+  const hasProgressCompleted = totalItems > 0 && completedItems === totalItems;
 
   const routinesLimit = features.maxRoutines;
 
@@ -352,6 +355,13 @@ export const UserDashboard: React.FC = () => {
   };
 
   const todayEntry = getTodayEntry();
+  const hasMoodLogged = !!todayEntry;
+  const hasRoutineProgress = routines.some(
+    (routine) => routine.completed || routine.steps.some((step) => step.completed)
+  );
+  const hasWeeklyData =
+    (metrics?.weeklySeries?.length ?? 0) > 0 &&
+    (metrics?.weeklySeries?.some((item) => item.value > 0) ?? false);
   // MOODS was unused and undefined here, logic uses MOOD_STYLES directly in JSX
 
   // --- Task Logic ---
@@ -656,8 +666,8 @@ export const UserDashboard: React.FC = () => {
   return (
     <div className="space-y-8 max-w-6xl mx-auto font-sans pb-24">
       {/* Header & Progress */}
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors relative overflow-hidden">
-        <UrgencyBadge symbol="!" />
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors relative">
+        {!hasProgressCompleted && <UrgencyBadge symbol="!" />}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <h1 className="text-4xl font-extrabold text-blue-900 dark:text-white tracking-tight leading-tight">
@@ -739,7 +749,7 @@ export const UserDashboard: React.FC = () => {
         <div className="lg:col-start-3 lg:row-start-1 space-y-6">
           <div
             className={`
-                p-5 rounded-2xl shadow-sm border transition-all duration-500 ease-in-out relative overflow-hidden
+                p-5 rounded-2xl shadow-sm border transition-all duration-500 ease-in-out relative
                 ${
                   todayEntry && MOOD_STYLES[todayEntry.mood]
                     ? `${MOOD_STYLES[todayEntry.mood].bg} ${
@@ -749,11 +759,13 @@ export const UserDashboard: React.FC = () => {
                 }
             `}
           >
-            <UrgencyBadge
-              symbol="?!"
-              gradient="from-fuchsia-500 via-purple-500 to-indigo-500"
-              ring="ring-purple-200/60"
-            />
+            {!hasMoodLogged && (
+              <UrgencyBadge
+                symbol="?!"
+                gradient="from-fuchsia-500 via-purple-500 to-indigo-500"
+                ring="ring-purple-200/60"
+              />
+            )}
             <div className="flex items-center gap-3 mb-3">
               <div
                 className={`p-2 rounded-lg ${
@@ -862,12 +874,14 @@ export const UserDashboard: React.FC = () => {
 
         {/* 2. ROUTINES CARD */}
         <div className="lg:col-span-2 lg:row-start-1 lg:row-span-2 space-y-6">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors relative overflow-hidden">
-            <UrgencyBadge
-              symbol="!!!"
-              gradient="from-orange-400 via-amber-500 to-red-500"
-              ring="ring-orange-200/60"
-            />
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors relative">
+            {!hasRoutineProgress && (
+              <UrgencyBadge
+                symbol="!!!"
+                gradient="from-orange-400 via-amber-500 to-red-500"
+                ring="ring-orange-200/60"
+              />
+            )}
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <Sun size={20} className="text-amber-500" /> Rotinas
@@ -980,13 +994,15 @@ export const UserDashboard: React.FC = () => {
 
         {/* 3. WEEKLY SUMMARY CARD */}
         <div className="lg:col-start-3 lg:row-start-2 space-y-6">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 transition-all overflow-hidden relative hover:shadow-xl duration-300">
-            <UrgencyBadge
-              symbol="***"
-              gradient="from-blue-500 via-sky-500 to-cyan-400"
-              ring="ring-sky-200/60"
-              className="-top-4 -right-4"
-            />
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 transition-all relative hover:shadow-xl duration-300">
+            {!hasWeeklyData && (
+              <UrgencyBadge
+                symbol="***"
+                gradient="from-blue-500 via-sky-500 to-cyan-400"
+                ring="ring-sky-200/60"
+                className="-top-4 -right-4"
+              />
+            )}
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600"></div>
             <div className="p-6 pb-2 flex justify-between items-center mt-2">
               <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
