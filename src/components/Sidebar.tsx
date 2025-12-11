@@ -46,7 +46,8 @@ const planStyles: Record<
   },
   [PlanTier.BASIC]: {
     icon: "/Basic.png",
-    gradient: "linear-gradient(135deg, #0F0F1C 0%, #052040 30%, #0E4B96 60%, #0066CC 85%, #42A3FF 100%)",
+    gradient:
+      "linear-gradient(135deg, #0F0F1C 0%, #052040 30%, #0E4B96 60%, #0066CC 85%, #42A3FF 100%)",
     glow: "0 12px 40px rgba(14, 75, 150, 0.35)",
     accent: "#42A3FF",
     halo: "rgba(66, 163, 255, 0.35)",
@@ -64,21 +65,27 @@ const PlanBadge: React.FC<{ plan: PlanTier }> = ({ plan }) => {
     >
       <div
         className="absolute inset-0 blur-2xl opacity-60"
-        style={{ background: `radial-gradient(circle at 25% 25%, ${style.halo}, transparent 55%)` }}
+        style={{
+          background: `radial-gradient(circle at 25% 25%, ${style.halo}, transparent 55%)`,
+        }}
       />
-      <div className="relative flex items-center gap-3 p-3">
-        <div
-          className="h-12 w-12 flex-shrink-0 rounded-lg overflow-hidden"
-        >
+      <div className="relative flex items-center gap-4 p-3">
+        <div className="h-16 w-16 flex-shrink-0 rounded-2xl overflow-hidden">
           <img
             src={style.icon}
             alt={`${plan} icon`}
-            className="block h-full w-full object-cover"
+            className="block h-full w-full object-cover scale-[2.1]"
           />
         </div>
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/80">Plano</p>
-          <p className={`text-lg font-extrabold leading-tight ${style.textClass}`}>{plan}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/80">
+            Plano
+          </p>
+          <p
+            className={`text-lg font-extrabold leading-tight ${style.textClass}`}
+          >
+            {plan}
+          </p>
         </div>
       </div>
     </div>
@@ -94,9 +101,11 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
   const location = useLocation();
   const [navVisits, setNavVisits] = useState<Record<string, boolean>>({});
-  const [upgradeInfo, setUpgradeInfo] = useState<
-    { feature: string; required: PlanTier; current: PlanTier } | null
-  >(null);
+  const [upgradeInfo, setUpgradeInfo] = useState<{
+    feature: string;
+    required: PlanTier;
+    current: PlanTier;
+  } | null>(null);
 
   useEffect(() => {
     const key = `focuspro_nav_visits_${user.id}`;
@@ -183,13 +192,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
       `}
       >
         {restricted && (
-          <div className="absolute inset-0 bg-white/70 dark:bg-slate-900/60 backdrop-blur-[1.5px]" aria-hidden />
+          <div
+            className="absolute inset-0 bg-white/70 dark:bg-slate-900/60 backdrop-blur-[1.5px]"
+            aria-hidden
+          />
         )}
 
         {showNag && (
-          <span
-            className="absolute -left-2 top-1/2 -translate-y-1/2 bg-gradient-to-br from-amber-400 via-red-500 to-rose-500 text-white text-[10px] font-black rounded-full px-2 py-1 shadow-lg ring-2 ring-amber-100/70"
-          >
+          <span className="absolute -left-2 top-1/2 -translate-y-1/2 bg-gradient-to-br from-amber-400 via-red-500 to-rose-500 text-white text-[10px] font-black rounded-full px-2 py-1 shadow-lg ring-2 ring-amber-100/70">
             !
           </span>
         )}
@@ -201,9 +211,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
           }`}
         />
 
-      {/* Label Container - Hidden on Desktop Collapsed, Shown on Hover */}
-      <span
-        className={`
+        {/* Label Container - Hidden on Desktop Collapsed, Shown on Hover */}
+        <span
+          className={`
         whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out
         /* Mobile: Always Visible */
         ml-3
@@ -211,28 +221,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
         md:ml-0 md:w-0 md:opacity-0 
         md:group-hover:ml-3 md:group-hover:w-auto md:group-hover:opacity-100
       `}
-      >
-        {label}
-      </span>
+        >
+          {label}
+        </span>
 
-      {premium && (
-        <Crown
-          size={14}
-          className={`
+        {premium && (
+          <Crown
+            size={14}
+            className={`
           text-amber-500 absolute right-4
           /* Desktop Logic: Hidden collapsed, Visible expanded */
           md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300
         `}
-        />
-      )}
+          />
+        )}
 
-      {restricted && (
-        <div className="absolute right-4 flex items-center gap-1 text-slate-500 dark:text-slate-300 text-xs font-semibold">
-          <Lock size={14} />
-          <span className="hidden md:inline">Exclusivo</span>
-        </div>
-      )}
-    </Link>
+        {restricted && (
+          <div className="absolute right-4 flex items-center gap-1 text-slate-500 dark:text-slate-300 text-xs font-semibold">
+            <Lock size={14} />
+            <span className="hidden md:inline">Exclusivo</span>
+          </div>
+        )}
+      </Link>
     );
   };
 
@@ -414,19 +424,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
                 <Lock />
               </div>
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] font-bold text-slate-400">Upgrade necessário</p>
-                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">Desbloqueie {upgradeInfo.feature}</h3>
+                <p className="text-xs uppercase tracking-[0.2em] font-bold text-slate-400">
+                  Upgrade necessário
+                </p>
+                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                  Desbloqueie {upgradeInfo.feature}
+                </h3>
               </div>
             </div>
             <p className="text-sm text-slate-600 dark:text-slate-300 mb-4 leading-relaxed">
-              Seu plano atual ({upgradeInfo.current}) não inclui este recurso. Faça o upgrade para o plano {upgradeInfo.required} e libere tudo agora.
+              Seu plano atual ({upgradeInfo.current}) não inclui este recurso.
+              Faça o upgrade para o plano {upgradeInfo.required} e libere tudo
+              agora.
             </p>
             <div className="flex flex-wrap gap-3">
               <button
                 className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-xl shadow-lg"
                 onClick={() => {
                   setUpgradeInfo(null);
-                  alert("Upgrade de plano solicitado! Nossa equipe entrará em contato.");
+                  alert(
+                    "Upgrade de plano solicitado! Nossa equipe entrará em contato."
+                  );
                 }}
               >
                 <span>Quero fazer upgrade</span>
