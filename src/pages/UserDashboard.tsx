@@ -207,6 +207,7 @@ export const UserDashboard: React.FC = () => {
     { day: "Dom", value: 65 },
   ];
 
+
   // Async Load Data
   useEffect(() => {
     const loadData = async () => {
@@ -322,6 +323,7 @@ export const UserDashboard: React.FC = () => {
   const completedItems = completedTasksCount + completedRoutineSteps;
   const progressPercentage =
     totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
+  const hasProgressCompleted = totalItems > 0 && completedItems === totalItems;
 
   const routinesLimit = features.maxRoutines;
 
@@ -333,6 +335,13 @@ export const UserDashboard: React.FC = () => {
   };
 
   const todayEntry = getTodayEntry();
+  const hasMoodLogged = !!todayEntry;
+  const hasRoutineProgress = routines.some(
+    (routine) => routine.completed || routine.steps.some((step) => step.completed)
+  );
+  const hasWeeklyData =
+    (metrics?.weeklySeries?.length ?? 0) > 0 &&
+    (metrics?.weeklySeries?.some((item) => item.value > 0) ?? false);
   // MOODS was unused and undefined here, logic uses MOOD_STYLES directly in JSX
 
   // --- Task Logic ---
@@ -637,7 +646,7 @@ export const UserDashboard: React.FC = () => {
   return (
     <div className="space-y-8 max-w-6xl mx-auto font-sans pb-24">
       {/* Header & Progress */}
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors">
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors relative">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <h1 className="text-4xl font-extrabold text-blue-900 dark:text-white tracking-tight leading-tight">
@@ -719,7 +728,7 @@ export const UserDashboard: React.FC = () => {
         <div className="lg:col-start-3 lg:row-start-1 space-y-6">
           <div
             className={`
-                p-5 rounded-2xl shadow-sm border transition-all duration-500 ease-in-out
+                p-5 rounded-2xl shadow-sm border transition-all duration-500 ease-in-out relative
                 ${
                   todayEntry && MOOD_STYLES[todayEntry.mood]
                     ? `${MOOD_STYLES[todayEntry.mood].bg} ${
@@ -837,7 +846,7 @@ export const UserDashboard: React.FC = () => {
 
         {/* 2. ROUTINES CARD */}
         <div className="lg:col-span-2 lg:row-start-1 lg:row-span-2 space-y-6">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors relative">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <Sun size={20} className="text-amber-500" /> Rotinas
@@ -950,7 +959,7 @@ export const UserDashboard: React.FC = () => {
 
         {/* 3. WEEKLY SUMMARY CARD */}
         <div className="lg:col-start-3 lg:row-start-2 space-y-6">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 transition-all overflow-hidden relative hover:shadow-xl duration-300">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 transition-all relative hover:shadow-xl duration-300">
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600"></div>
             <div className="p-6 pb-2 flex justify-between items-center mt-2">
               <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
