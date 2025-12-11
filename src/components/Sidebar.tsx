@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { User, UserRole, PlanTier } from "../types";
 import { AuthService } from "../services/authService";
@@ -91,6 +91,32 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
   const location = useLocation();
+  const [navVisits, setNavVisits] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const key = `focuspro_nav_visits_${user.id}`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      try {
+        setNavVisits(JSON.parse(stored));
+      } catch (error) {
+        console.error("Failed to parse nav visits", error);
+      }
+    }
+  }, [user.id]);
+
+  const persistVisits = (updated: Record<string, boolean>) => {
+    const key = `focuspro_nav_visits_${user.id}`;
+    setNavVisits(updated);
+    localStorage.setItem(key, JSON.stringify(updated));
+  };
+
+  useEffect(() => {
+    if (!navVisits[location.pathname]) {
+      persistVisits({ ...navVisits, [location.pathname]: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -106,11 +132,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
     label: string;
     restricted?: boolean;
     premium?: boolean;
-  }) => (
-    <Link
-      to={to}
-      onClick={onClose}
-      className={`
+  }) => {
+    const showNag = !restricted && !navVisits[to];
+
+    const handleClick = () => {
+      if (!navVisits[to]) {
+        persistVisits({ ...navVisits, [to]: true });
+      }
+      onClose();
+    };
+
+    return (
+      <Link
+        to={to}
+        onClick={handleClick}
+        className={`
         relative flex items-center px-4 py-3 rounded-xl transition-all duration-300 group/item mb-1
         ${
           isActive(to)
@@ -122,13 +158,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
         /* Desktop: Center by default (collapsed), Left on hover (expanded) */
         md:justify-center md:group-hover:justify-start
       `}
-    >
-      <Icon
-        size={22}
-        className={`flex-shrink-0 transition-colors ${
-          premium ? "text-amber-500" : ""
-        }`}
-      />
+      >
+        {showNag && (
+          <span
+            className="absolute -left-2 top-1/2 -translate-y-1/2 bg-gradient-to-br from-amber-400 via-red-500 to-rose-500 text-white text-[10px] font-black rounded-full px-2 py-1 shadow-lg ring-2 ring-amber-100/70"
+          >
+            !
+          </span>
+        )}
+
+        <Icon
+          size={22}
+          className={`flex-shrink-0 transition-colors ${
+            premium ? "text-amber-500" : ""
+          }`}
+        />
 
       {/* Label Container - Hidden on Desktop Collapsed, Shown on Hover */}
       <span
@@ -155,7 +199,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
         />
       )}
     </Link>
-  );
+    );
+  };
 
   return (
     <>
