@@ -60,7 +60,14 @@ const PlanBadge: React.FC<{ plan: PlanTier }> = ({ plan }) => {
 
   return (
     <div
-      className="relative rounded-xl overflow-hidden border border-white/30 dark:border-white/10 shadow-lg"
+      className="
+        relative 
+        w-full                /* ocupa toda a largura disponível */
+        rounded-2xl           /* um pouco mais arredondado, mas não pílula */
+        overflow-hidden 
+        border border-white/30 dark:border-white/10 
+        shadow-lg
+      "
       style={{ background: style.gradient, boxShadow: style.glow }}
     >
       <div
@@ -69,8 +76,10 @@ const PlanBadge: React.FC<{ plan: PlanTier }> = ({ plan }) => {
           background: `radial-gradient(circle at 25% 25%, ${style.halo}, transparent 55%)`,
         }}
       />
-      <div className="relative flex items-center gap-4 p-3">
-        <div className="h-16 w-16 flex-shrink-0 rounded-2xl overflow-hidden">
+
+      {/* Aqui eu alargo mais no X e mantenho a altura equilibrada */}
+      <div className="relative flex items-center gap-4 pl-3 pr-6 py-3">
+        <div className="h-16 w-16 flex-shrink-0 rounded-2xl overflow-hidden -ml-1">
           <img
             src={style.icon}
             alt={`${plan} icon`}
@@ -91,7 +100,6 @@ const PlanBadge: React.FC<{ plan: PlanTier }> = ({ plan }) => {
     </div>
   );
 };
-
 interface SidebarProps {
   user: User;
   isOpen: boolean;
