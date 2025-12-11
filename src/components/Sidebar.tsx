@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { User, UserRole, PlanTier } from "../types";
 import { AuthService } from "../services/authService";
@@ -11,6 +11,8 @@ import {
   LogOut,
   Crown,
   BrainCircuit,
+  Lock,
+  ArrowUpRight,
   X,
   Users, // Added icon
 } from "lucide-react";
@@ -92,6 +94,9 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
   const location = useLocation();
   const [navVisits, setNavVisits] = useState<Record<string, boolean>>({});
+  const [upgradeInfo, setUpgradeInfo] = useState<
+    { feature: string; required: PlanTier; current: PlanTier } | null
+  >(null);
 
   useEffect(() => {
     const key = `focuspro_nav_visits_${user.id}`;
@@ -120,22 +125,42 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
 
   const isActive = (path: string) => location.pathname === path;
 
+  const nextPlanFor = useMemo(() => {
+    return {
+      [PlanTier.BASIC]: PlanTier.PRO,
+      [PlanTier.PRO]: PlanTier.PREMIUM,
+      [PlanTier.PREMIUM]: PlanTier.PREMIUM,
+    } as const;
+  }, []);
+
   const NavItem = ({
     to,
     icon: Icon,
     label,
     restricted,
     premium,
+    requiredPlan,
   }: {
     to: string;
     icon: any;
     label: string;
     restricted?: boolean;
     premium?: boolean;
+    requiredPlan?: PlanTier;
   }) => {
     const showNag = !restricted && !navVisits[to];
 
-    const handleClick = () => {
+    const handleClick = (e: React.MouseEvent) => {
+      if (restricted) {
+        e.preventDefault();
+        setUpgradeInfo({
+          feature: label,
+          required: requiredPlan || nextPlanFor[user.plan],
+          current: user.plan,
+        });
+        return;
+      }
+
       if (!navVisits[to]) {
         persistVisits({ ...navVisits, [to]: true });
       }
@@ -147,18 +172,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
         to={to}
         onClick={handleClick}
         className={`
-        relative flex items-center px-4 py-3 rounded-xl transition-all duration-300 group/item mb-1
+        relative flex items-center px-4 py-3 rounded-xl transition-all duration-300 group/item mb-1 overflow-hidden
         ${
           isActive(to)
             ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium"
             : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
         }
-        ${restricted ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}
-        /* Mobile: Default Left Align */
-        /* Desktop: Center by default (collapsed), Left on hover (expanded) */
+        ${restricted ? "saturate-50" : ""}
         md:justify-center md:group-hover:justify-start
       `}
       >
+        {restricted && (
+          <div className="absolute inset-0 bg-white/70 dark:bg-slate-900/60 backdrop-blur-[1.5px]" aria-hidden />
+        )}
+
         {showNag && (
           <span
             className="absolute -left-2 top-1/2 -translate-y-1/2 bg-gradient-to-br from-amber-400 via-red-500 to-rose-500 text-white text-[10px] font-black rounded-full px-2 py-1 shadow-lg ring-2 ring-amber-100/70"
@@ -197,6 +224,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
           md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300
         `}
         />
+      )}
+
+      {restricted && (
+        <div className="absolute right-4 flex items-center gap-1 text-slate-500 dark:text-slate-300 text-xs font-semibold">
+          <Lock size={14} />
+          <span className="hidden md:inline">Exclusivo</span>
+        </div>
       )}
     </Link>
     );
@@ -262,7 +296,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
           md:group-hover:h-auto md:group-hover:py-4 md:group-hover:opacity-100
         `}
         >
-          <PlanBadge plan={user.plan} />
+          <button
+            type="button"
+            onClick={() => {
+              if (user.plan !== PlanTier.PREMIUM) {
+                setUpgradeInfo({
+                  feature: "Seu plano",
+                  required: nextPlanFor[user.plan],
+                  current: user.plan,
+                });
+              }
+            }}
+            className="w-full text-left focus:outline-none"
+          >
+            <PlanBadge plan={user.plan} />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -298,6 +346,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
             label="Modo Foco"
             restricted={user.plan === PlanTier.BASIC}
             premium={user.plan !== PlanTier.BASIC}
+            requiredPlan={PlanTier.PRO}
           />
 
           <NavItem
@@ -306,6 +355,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
             label="Materiais & Aulas"
             restricted={user.plan === PlanTier.BASIC}
             premium={user.plan !== PlanTier.BASIC}
+            requiredPlan={PlanTier.PRO}
           />
 
           <NavItem
@@ -314,6 +364,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
             label="Diário Emocional"
             restricted={user.plan !== PlanTier.PREMIUM}
             premium={user.plan === PlanTier.PREMIUM}
+            requiredPlan={PlanTier.PREMIUM}
           />
 
           <NavItem
@@ -322,6 +373,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
             label="Comunidade"
             restricted={user.plan !== PlanTier.PREMIUM}
             premium={user.plan === PlanTier.PREMIUM}
+            requiredPlan={PlanTier.PREMIUM}
           />
         </nav>
 
@@ -347,6 +399,49 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
           </button>
         </div>
       </div>
+
+      {upgradeInfo && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/70 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-blue-100 dark:border-slate-700">
+            <button
+              onClick={() => setUpgradeInfo(null)}
+              className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              <X size={18} />
+            </button>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg text-white">
+                <Lock />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] font-bold text-slate-400">Upgrade necessário</p>
+                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">Desbloqueie {upgradeInfo.feature}</h3>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mb-4 leading-relaxed">
+              Seu plano atual ({upgradeInfo.current}) não inclui este recurso. Faça o upgrade para o plano {upgradeInfo.required} e libere tudo agora.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-xl shadow-lg"
+                onClick={() => {
+                  setUpgradeInfo(null);
+                  alert("Upgrade de plano solicitado! Nossa equipe entrará em contato.");
+                }}
+              >
+                <span>Quero fazer upgrade</span>
+                <ArrowUpRight size={16} />
+              </button>
+              <button
+                className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+                onClick={() => setUpgradeInfo(null)}
+              >
+                Agora não
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
