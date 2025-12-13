@@ -1,19 +1,22 @@
-import React, { useState, useEffect, useRef } from "react";
+// UserDashboard.tsx
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   User,
   Task,
   Routine,
-  RoutineStep,
   PlanTier,
   PLAN_FEATURES,
   TaskStatus,
   JournalEntry,
-  MoodType,
 } from "../types";
 import { AuthService } from "../services/authService";
 import { DataService } from "../services/dataService";
 import { GeminiService } from "../services/geminiService";
+
+// --- DASHBOARD METRICS (Supabase) ---
+import { useDashboardMetrics } from "../hooks/userDashboardMetrics";
+
 import {
   Plus,
   CheckCircle2,
@@ -22,46 +25,32 @@ import {
   Sun,
   FileText,
   TrendingUp,
-  Download,
-  Play,
-  Pause,
   Moon,
   Heart,
   Zap,
   Coffee,
   X,
   ChevronDown,
-  ChevronUp,
-  Timer,
   Watch,
-  Calendar,
   ArrowRight,
-  Circle,
-  PauseCircle,
-  Ban,
-  Clock,
-  MoreHorizontal,
-  Check,
   Loader2,
   Activity,
   Target,
   ArrowUpRight,
-  ArrowDownRight,
   Smile,
+  Lightbulb,
 } from "lucide-react";
+
 import {
-  BarChart,
-  Bar,
-  XAxis,
   ResponsiveContainer,
   AreaChart,
   Area,
   Tooltip,
   CartesianGrid,
+  XAxis,
 } from "recharts";
 
-// --- DASHBOARD METRICS (Supabase) ---
-import { useDashboardMetrics } from "../hooks/userDashboardMetrics";
+import confetti from "canvas-confetti";
 
 // --- CONSTANTS FOR MOOD ---
 const MOTIVATIONAL_QUOTES = [
@@ -87,42 +76,41 @@ const MOTIVATIONAL_QUOTES = [
   "Você merece cuidado e tranquilidade — comece por um minuto de gentileza consigo.",
 ];
 
-// Updated Styles for Dynamic Mood Card (Pastel/Soft Palette)
 const MOOD_STYLES: Record<
   string,
   { bg: string; border: string; text: string; emoji: string; label: string }
 > = {
   great: {
-    bg: "bg-teal-50 dark:bg-teal-900/20",
-    border: "border-teal-200 dark:border-teal-800",
+    bg: "bg-teal-50 dark:bg-teal-900/10",
+    border: "border-teal-200 dark:border-teal-800/30",
     text: "text-teal-700 dark:text-teal-300",
     emoji: "😄",
     label: "Ótimo",
   },
   good: {
-    bg: "bg-blue-50 dark:bg-blue-900/20",
-    border: "border-blue-200 dark:border-blue-800",
+    bg: "bg-blue-50 dark:bg-blue-900/10",
+    border: "border-blue-200 dark:border-blue-800/30",
     text: "text-blue-700 dark:text-blue-300",
     emoji: "🙂",
     label: "Bem",
   },
   neutral: {
-    bg: "bg-slate-100 dark:bg-slate-800",
-    border: "border-slate-200 dark:border-slate-700",
+    bg: "bg-slate-100 dark:bg-[#121620]",
+    border: "border-slate-200 dark:border-white/10",
     text: "text-slate-600 dark:text-slate-400",
     emoji: "😐",
     label: "Neutro",
   },
   bad: {
-    bg: "bg-orange-50 dark:bg-orange-900/20",
-    border: "border-orange-200 dark:border-orange-800",
+    bg: "bg-orange-50 dark:bg-orange-900/10",
+    border: "border-orange-200 dark:border-orange-800/30",
     text: "text-orange-700 dark:text-orange-300",
     emoji: "😞",
     label: "Mal",
   },
   terrible: {
-    bg: "bg-rose-50 dark:bg-rose-900/20",
-    border: "border-rose-200 dark:border-rose-800",
+    bg: "bg-rose-50 dark:bg-rose-900/10",
+    border: "border-rose-200 dark:border-rose-800/30",
     text: "text-rose-700 dark:text-rose-300",
     emoji: "😣",
     label: "Péssimo",
@@ -131,13 +119,16 @@ const MOOD_STYLES: Record<
 
 export const UserDashboard: React.FC = () => {
   const [user, setUser] = useState<User | null>(AuthService.getCurrentUser());
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [motivation, setMotivation] = useState<string>("");
   const [loadingAi, setLoadingAi] = useState(false);
   const [exportingReport, setExportingReport] = useState(false);
+
   const navigate = useNavigate();
 
   // Tutorial State
@@ -185,56 +176,57 @@ export const UserDashboard: React.FC = () => {
   // Routine load indicator
   const [loadingRoutineId, setLoadingRoutineId] = useState<string | null>(null);
 
+  // Default Pomodoro time (25 min)
   const POMODORO_TIME = 25 * 60;
 
-  // Filtro e métricas do dashboard (AGORA dentro do componente)
+  // Period filter + metrics (Supabase)
   const [periodFilter, setPeriodFilter] = useState<
     "Hoje" | "Ontem" | "Semana" | "Mês" | "Sempre"
   >("Semana");
+
   const {
     metrics,
     loading: loadingMetrics,
     refresh,
   } = useDashboardMetrics(user?.id ?? null, periodFilter);
 
-  const weeklyConsistencyData = [
-    { day: "Seg", value: 45 },
-    { day: "Ter", value: 72 },
-    { day: "Qua", value: 60 },
-    { day: "Qui", value: 85 },
-    { day: "Sex", value: 50 },
-    { day: "Sab", value: 90 },
-    { day: "Dom", value: 65 },
-  ];
-
-
   // Async Load Data
   useEffect(() => {
     const loadData = async () => {
-      if (user) {
-        try {
-          const [loadedTasks, loadedRoutines, loadedJournal] =
-            await Promise.all([
-              DataService.getTasks(user.id),
-              DataService.getRoutines(user.id),
-              DataService.getJournalEntries(user.id),
-            ]);
-          setTasks(loadedTasks);
-          setRoutines(loadedRoutines);
-          setJournalEntries(loadedJournal);
-        } catch (error) {
-          console.error("Error loading dashboard data:", error);
-        }
+      if (!user) return;
+
+      try {
+        const [loadedTasks, loadedRoutines, loadedJournal] = await Promise.all([
+          DataService.getTasks(user.id),
+          DataService.getRoutines(user.id),
+          DataService.getJournalEntries(user.id),
+        ]);
+
+        setTasks(loadedTasks);
+        setRoutines(loadedRoutines);
+        setJournalEntries(loadedJournal);
+      } catch (error) {
+        console.error("Error loading dashboard data:", error);
       }
     };
+
     loadData();
   }, [user]);
+
+  // --- Helper: Get Today's Journal ---
+  const getTodayEntry = () => {
+    const today = new Date().toDateString();
+    return journalEntries.find(
+      (e) => new Date(e.date).toDateString() === today
+    );
+  };
 
   // --- ROUTINE TUTORIAL LOGIC ---
   useEffect(() => {
     const isDismissed = sessionStorage.getItem(
       "focuspro_routine_tutorial_dismissed"
     );
+
     if (routines.length === 0 && !isDismissed) {
       const timer = setTimeout(() => setShowRoutineTutorial(true), 800);
       return () => clearTimeout(timer);
@@ -248,6 +240,17 @@ export const UserDashboard: React.FC = () => {
     sessionStorage.setItem("focuspro_routine_tutorial_dismissed", "true");
   };
 
+  const openRoutineModal = () => {
+    setNewRoutine({
+      title: "",
+      time: "08:00",
+      category: "productivity",
+      steps: [],
+      frequency: ["Seg", "Ter", "Qua", "Qui", "Sex"],
+    });
+    setIsRoutineModalOpen(true);
+  };
+
   const openRoutineModalWithTutorial = () => {
     dismissRoutineTutorial();
     openRoutineModal();
@@ -256,65 +259,67 @@ export const UserDashboard: React.FC = () => {
   // Check Mood for Popup logic
   useEffect(() => {
     const todayEntry = getTodayEntry();
-    if (todayEntry) {
-      if (todayEntry.mood === "bad" || todayEntry.mood === "terrible") {
-        const todayStr = new Date().toDateString();
-        const lastSeen = localStorage.getItem(
-          `focuspro_mood_popup_${user?.id}`
-        );
+    if (!todayEntry) return;
 
-        if (lastSeen !== todayStr) {
-          const randomQuote =
-            MOTIVATIONAL_QUOTES[
-              Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)
-            ];
-          setMoodModalQuote(randomQuote);
-          setShowMoodModal(true);
-          localStorage.setItem(`focuspro_mood_popup_${user?.id}`, todayStr);
-        }
+    if (todayEntry.mood === "bad" || todayEntry.mood === "terrible") {
+      const todayStr = new Date().toDateString();
+      const lastSeen = localStorage.getItem(`focuspro_mood_popup_${user?.id}`);
+
+      if (lastSeen !== todayStr) {
+        const randomQuote =
+          MOTIVATIONAL_QUOTES[
+            Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)
+          ];
+        setMoodModalQuote(randomQuote);
+        setShowMoodModal(true);
+        localStorage.setItem(`focuspro_mood_popup_${user?.id}`, todayStr);
       }
     }
-  }, [journalEntries]);
+  }, [journalEntries, user?.id]);
 
   // Timer Interval Logic
   useEffect(() => {
     if (isTimerRunning && activeTaskId) {
       timerRef.current = setInterval(() => {
         setTimeValue((prev) => {
-          if (timerMode === "stopwatch") {
-            return prev + 1;
-          } else {
-            if (prev <= 0) {
-              setIsTimerRunning(false);
-              alert("Tempo esgotado!");
-              return 0;
-            }
-            return prev - 1;
+          if (timerMode === "stopwatch") return prev + 1;
+
+          // Timer mode (countdown)
+          if (prev <= 0) {
+            setIsTimerRunning(false);
+            alert("Tempo esgotado!");
+            return 0;
           }
+          return prev - 1;
         });
       }, 1000);
     } else {
       clearInterval(timerRef.current);
     }
+
     return () => clearInterval(timerRef.current);
   }, [isTimerRunning, activeTaskId, timerMode]);
 
   const features = user
     ? PLAN_FEATURES[user.plan]
     : PLAN_FEATURES[PlanTier.BASIC];
+  const routinesLimit = features.maxRoutines;
 
   const activeTasksCount = tasks.filter(
     (t) => t.status !== "completed" && t.status !== "canceled"
   ).length;
 
+  // Progress Calculation
   const totalRoutineSteps = routines.reduce(
     (acc, r) => acc + (r.steps.length || 1),
     0
   );
+
   const completedRoutineSteps = routines.reduce((acc, r) => {
     const stepsDone = r.steps.filter((s) => s.completed).length;
     return acc + (r.steps.length > 0 ? stepsDone : r.completed ? 1 : 0);
   }, 0);
+
   const completedTasksCount = tasks.filter(
     (t) => t.status === "completed"
   ).length;
@@ -323,26 +328,52 @@ export const UserDashboard: React.FC = () => {
   const completedItems = completedTasksCount + completedRoutineSteps;
   const progressPercentage =
     totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
-  const hasProgressCompleted = totalItems > 0 && completedItems === totalItems;
 
-  const routinesLimit = features.maxRoutines;
-
-  const getTodayEntry = () => {
+  // --- CONFETTI EFFECT LOGIC ---
+  useEffect(() => {
     const today = new Date().toDateString();
-    return journalEntries.find(
-      (e) => new Date(e.date).toDateString() === today
-    );
+    const lastCelebrationKey = `focuspro_last_celebration_${user?.id}`;
+    const lastCelebration = localStorage.getItem(lastCelebrationKey);
+
+    if (
+      progressPercentage === 100 &&
+      totalItems > 0 &&
+      lastCelebration !== today
+    ) {
+      triggerGoldConfetti();
+      localStorage.setItem(lastCelebrationKey, today);
+    }
+  }, [progressPercentage, totalItems, user?.id]);
+
+  const triggerGoldConfetti = () => {
+    const duration = 3000;
+    const end = Date.now() + duration;
+    const colors = ["#FFD700", "#FFA500", "#FACC15", "#fbbf24"];
+
+    (function frame() {
+      confetti({
+        particleCount: 4,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0 },
+        colors,
+        zIndex: 100,
+      });
+      confetti({
+        particleCount: 4,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1 },
+        colors,
+        zIndex: 100,
+      });
+
+      if (Date.now() < end) requestAnimationFrame(frame);
+    })();
   };
 
   const todayEntry = getTodayEntry();
-  const hasMoodLogged = !!todayEntry;
-  const hasRoutineProgress = routines.some(
-    (routine) => routine.completed || routine.steps.some((step) => step.completed)
-  );
-  const hasWeeklyData =
-    (metrics?.weeklySeries?.length ?? 0) > 0 &&
-    (metrics?.weeklySeries?.some((item) => item.value > 0) ?? false);
-  // MOODS was unused and undefined here, logic uses MOOD_STYLES directly in JSX
+  const currentMoodStyle = todayEntry ? MOOD_STYLES[todayEntry.mood] : null;
 
   // --- Task Logic ---
   const handleAddTask = async (e?: React.FormEvent, title?: string) => {
@@ -360,17 +391,22 @@ export const UserDashboard: React.FC = () => {
       priority: "medium",
     };
 
-    setTasks((prev) => [newTask, ...prev]); // Optimistic Update
+    setTasks((prev) => [newTask, ...prev]); // optimistic
     try {
       await DataService.addTask(newTask);
       refresh();
     } catch (err) {
       console.error("Failed to add task", err);
     }
+
     if (!title) setNewTaskTitle("");
   };
 
-  const updateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
+  const updateTaskStatus = async (
+    taskId: string,
+    newStatus: TaskStatus,
+    opts?: { fromFocus?: boolean }
+  ) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
@@ -379,7 +415,7 @@ export const UserDashboard: React.FC = () => {
       status: newStatus,
       completed: newStatus === "completed",
     };
-    setTasks(tasks.map((t) => (t.id === taskId ? updated : t))); // Optimistic
+    setTasks(tasks.map((t) => (t.id === taskId ? updated : t))); // optimistic
 
     try {
       await DataService.updateTask(updated);
@@ -392,14 +428,21 @@ export const UserDashboard: React.FC = () => {
       setIsTimerRunning(false);
       setActiveTaskId(null);
     }
-    if (newStatus === "in_progress" && activeTaskId !== taskId) {
+
+    // avoid recursion: only auto-focus if not triggered by focus flow
+    if (
+      newStatus === "in_progress" &&
+      !opts?.fromFocus &&
+      activeTaskId !== taskId
+    ) {
       activateTaskFocus(taskId);
     }
+
     setShowTaskMenuId(null);
   };
 
   const deleteTask = async (id: string) => {
-    setTasks(tasks.filter((t) => t.id !== id)); // Optimistic
+    setTasks(tasks.filter((t) => t.id !== id)); // optimistic
     try {
       await DataService.deleteTask(id);
       refresh();
@@ -419,9 +462,8 @@ export const UserDashboard: React.FC = () => {
   };
 
   const activateTaskFocus = (taskId: string) => {
-    if (activeTaskId === taskId) {
-      return;
-    }
+    if (activeTaskId === taskId) return;
+
     setActiveTaskId(taskId);
     setIsTimerRunning(true);
     setTimerMode("stopwatch");
@@ -429,22 +471,24 @@ export const UserDashboard: React.FC = () => {
 
     const task = tasks.find((t) => t.id === taskId);
     if (task && task.status !== "in_progress") {
-      updateTaskStatus(taskId, "in_progress");
+      // mark as in_progress without triggering activateTaskFocus again
+      updateTaskStatus(taskId, "in_progress", { fromFocus: true });
     }
   };
 
-  // --- Routine Logic ---
-  const openRoutineModal = () => {
-    setNewRoutine({
-      title: "",
-      time: "08:00",
-      category: "productivity",
-      steps: [],
-      frequency: ["Seg", "Ter", "Qua", "Qui", "Sex"],
-    });
-    setIsRoutineModalOpen(true);
+  const switchTimerMode = (mode: "stopwatch" | "timer") => {
+    setTimerMode(mode);
+    setIsTimerRunning(false);
+    setTimeValue(mode === "timer" ? POMODORO_TIME : 0);
   };
 
+  const quickSetTimer = (minutes: number) => {
+    setTimerMode("timer");
+    setIsTimerRunning(false);
+    setTimeValue(minutes * 60);
+  };
+
+  // --- Routine Logic ---
   const addStepToRoutine = () => {
     if (!tempStep.trim()) return;
     const steps = newRoutine.steps || [];
@@ -465,6 +509,7 @@ export const UserDashboard: React.FC = () => {
 
   const saveRoutine = async () => {
     if (!user || !newRoutine.title) return;
+
     if (routines.length >= routinesLimit) {
       alert(`Limite de rotinas do plano ${user.plan} atingido.`);
       return;
@@ -481,7 +526,7 @@ export const UserDashboard: React.FC = () => {
       completed: false,
     };
 
-    setRoutines([...routines, r]); // Optimistic
+    setRoutines((prev) => [...prev, r]); // optimistic
     setIsRoutineModalOpen(false);
 
     try {
@@ -500,6 +545,15 @@ export const UserDashboard: React.FC = () => {
       return;
     }
 
+    if (routines.length > 0) {
+      if (
+        !window.confirm(
+          "Isso adicionará novas rotinas baseadas na descrição. Continuar?"
+        )
+      )
+        return;
+    }
+
     setIsGenerating(true);
 
     try {
@@ -510,7 +564,7 @@ export const UserDashboard: React.FC = () => {
       );
 
       if (aiRoutines && Array.isArray(aiRoutines)) {
-        const mappedRoutines = aiRoutines.map((r: any) => ({
+        const mappedRoutines: Routine[] = aiRoutines.map((r: any) => ({
           id: crypto.randomUUID(),
           userId: user.id,
           title: r.title,
@@ -521,19 +575,21 @@ export const UserDashboard: React.FC = () => {
           completed: false,
         }));
 
-        setRoutines([...routines, ...mappedRoutines]);
+        setRoutines((prev) => [...prev, ...mappedRoutines]);
         setIsRoutineModalOpen(false);
 
-        // Persist generated routines
-        for (const r of mappedRoutines) {
-          for (const r of mappedRoutines) {
-            await DataService.addRoutine(r);
-          }
-          refresh();
-        }
+        // persist
+        await Promise.all(
+          mappedRoutines.map((rt) => DataService.addRoutine(rt))
+        );
+        refresh();
+
         alert("Rotinas criadas com sucesso pela IA!");
+      } else {
+        alert("A IA não retornou rotinas válidas. Tente novamente.");
       }
     } catch (error) {
+      console.error(error);
       alert("Erro ao gerar rotinas. Tente novamente.");
     } finally {
       setIsGenerating(false);
@@ -549,7 +605,10 @@ export const UserDashboard: React.FC = () => {
     );
     const updatedRoutine = { ...routine, steps: newSteps };
 
-    setRoutines(routines.map((r) => (r.id === routineId ? updatedRoutine : r))); // Optimistic
+    setRoutines((prev) =>
+      prev.map((r) => (r.id === routineId ? updatedRoutine : r))
+    ); // optimistic
+
     if (selectedRoutine && selectedRoutine.id === routineId) {
       setSelectedRoutine(updatedRoutine);
     }
@@ -564,8 +623,10 @@ export const UserDashboard: React.FC = () => {
 
   const deleteRoutine = async (id: string) => {
     if (!window.confirm("Excluir esta rotina?")) return;
-    setRoutines(routines.filter((r) => r.id !== id)); // Optimistic
+
+    setRoutines((prev) => prev.filter((r) => r.id !== id)); // optimistic
     setSelectedRoutine(null);
+
     try {
       await DataService.deleteRoutine(id);
       refresh();
@@ -576,8 +637,10 @@ export const UserDashboard: React.FC = () => {
 
   const fetchAndSelectRoutine = async (routineId: string) => {
     setLoadingRoutineId(routineId);
+
     try {
       const latestRoutine = await DataService.getRoutineById(routineId);
+
       if (latestRoutine) {
         setSelectedRoutine(latestRoutine);
         setRoutines((prev) =>
@@ -596,15 +659,94 @@ export const UserDashboard: React.FC = () => {
 
   const handleExportReport = () => {
     setExportingReport(true);
-    // ... same logic for CSV export ...
+
+    const header = [
+      "Relatório de Produtividade - FocusPro",
+      `Usuário: ${user?.name ?? "-"}`,
+      `Data: ${new Date().toLocaleDateString()}`,
+      `Período: ${periodFilter}`,
+    ];
+
+    const weeklySeries =
+      (metrics?.weeklySeries?.length ?? 0) > 0
+        ? metrics!.weeklySeries
+        : [
+            { day: "Seg", value: 0 },
+            { day: "Ter", value: 0 },
+            { day: "Qua", value: 0 },
+            { day: "Qui", value: 0 },
+            { day: "Sex", value: 0 },
+            { day: "Sab", value: 0 },
+            { day: "Dom", value: 0 },
+          ];
+
+    const summaryHeader = ["Resumo", "Valor"];
+    const summaryRows = [
+      ["Consistência (%)", `${metrics?.consistencyPercent ?? 0}%`],
+      ["Média diária (itens)", `${Math.round(metrics?.dailyAverage ?? 0)}`],
+      ["Micro-passos concluídos", `${completedItems}`],
+      ["Micro-passos totais", `${totalItems}`],
+    ];
+
+    const weeklyHeader = ["Dia", "Consistência (%)"];
+    const weeklyRows = weeklySeries.map((d) => [d.day, `${d.value}%`]);
+
+    const routinesHeader = [
+      "Rotina",
+      "Categoria",
+      "Horário",
+      "Frequência",
+      "Progresso",
+    ];
+    const routinesRows = routines.map((r) => {
+      const stepsDone = r.steps.filter((s) => s.completed).length;
+      const stepsTotal = r.steps.length || 1;
+      const progress = Math.round((stepsDone / stepsTotal) * 100);
+      return [
+        r.title,
+        r.category,
+        r.time,
+        r.frequency.join("/"),
+        `${progress}%`,
+      ];
+    });
+
+    const BOM = "\uFEFF";
+    const csvContent = [
+      header.join(";"),
+      "",
+      summaryHeader.join(";"),
+      ...summaryRows.map((r) => r.join(";")),
+      "",
+      weeklyHeader.join(";"),
+      ...weeklyRows.map((r) => r.join(";")),
+      "",
+      routinesHeader.join(";"),
+      ...routinesRows.map((r) => r.join(";")),
+    ].join("\n");
+
+    const blob = new Blob([BOM + csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `relatorio_focuspro_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
     setTimeout(() => setExportingReport(false), 1000);
   };
 
-  // ... Render Helpers (getCategoryIcon, getCategoryLabel, etc. same as before) ...
+  // --- Render Helpers ---
   const getCategoryIcon = (cat: string) => {
     switch (cat) {
       case "afternoon":
-        return <Sun size={18} className="text-orange-500" />; // ou outro ícone
+        return <Sun size={18} className="text-orange-500" />;
       case "morning":
         return <Sun size={18} className="text-amber-500" />;
       case "night":
@@ -613,6 +755,8 @@ export const UserDashboard: React.FC = () => {
         return <Heart size={18} className="text-red-500" />;
       case "productivity":
         return <Zap size={18} className="text-blue-500" />;
+      case "focus":
+        return <Target size={18} className="text-indigo-500" />;
       case "emotional":
         return <Heart size={18} className="text-pink-500" />;
       default:
@@ -643,10 +787,35 @@ export const UserDashboard: React.FC = () => {
     }
   };
 
+  // Weekly series for chart (metrics-driven)
+  const chartData =
+    (metrics?.weeklySeries?.length ?? 0) > 0
+      ? metrics!.weeklySeries
+      : [
+          { day: "Seg", value: 0 },
+          { day: "Ter", value: 0 },
+          { day: "Qua", value: 0 },
+          { day: "Qui", value: 0 },
+          { day: "Sex", value: 0 },
+          { day: "Sab", value: 0 },
+          { day: "Dom", value: 0 },
+        ];
+
+  // “Rotina / Status” list in summary: top 3 by progress
+  const topRoutines = [...routines]
+    .map((r) => {
+      const stepsDone = r.steps.filter((s) => s.completed).length;
+      const stepsTotal = r.steps.length || 1;
+      const progress = Math.round((stepsDone / stepsTotal) * 100);
+      return { id: r.id, title: r.title, progress };
+    })
+    .sort((a, b) => b.progress - a.progress)
+    .slice(0, 3);
+
   return (
     <div className="space-y-8 max-w-6xl mx-auto font-sans pb-24">
       {/* Header & Progress */}
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors relative">
+      <div className="bg-white dark:bg-[#121620] p-6 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm transition-colors">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <h1 className="text-4xl font-extrabold text-blue-900 dark:text-white tracking-tight leading-tight">
@@ -662,13 +831,17 @@ export const UserDashboard: React.FC = () => {
           <div className="flex gap-3 mt-4 md:mt-0">
             <button
               onClick={async () => {
+                if (!user) return;
                 setLoadingAi(true);
-                const txt = await GeminiService.getDailyMotivation(
-                  user!.name,
-                  activeTasksCount
-                );
-                setMotivation(txt);
-                setLoadingAi(false);
+                try {
+                  const txt = await GeminiService.getDailyMotivation(
+                    user.name,
+                    activeTasksCount
+                  );
+                  setMotivation(txt);
+                } finally {
+                  setLoadingAi(false);
+                }
               }}
               disabled={loadingAi}
               className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors font-medium text-sm"
@@ -680,7 +853,7 @@ export const UserDashboard: React.FC = () => {
               <button
                 onClick={handleExportReport}
                 disabled={exportingReport}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors font-medium text-sm"
               >
                 <FileText size={16} /> Relatório
               </button>
@@ -689,7 +862,7 @@ export const UserDashboard: React.FC = () => {
         </div>
 
         {/* Global Progress Bar */}
-        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-5 transition-colors border border-slate-100 dark:border-slate-800">
+        <div className="bg-slate-50 dark:bg-[#0B0E14] rounded-2xl p-5 transition-colors border border-slate-100 dark:border-white/10">
           <div className="flex justify-between items-end mb-3">
             <div>
               <span className="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-1">
@@ -704,7 +877,7 @@ export const UserDashboard: React.FC = () => {
             </span>
           </div>
 
-          <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-6 overflow-hidden shadow-inner">
+          <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-6 overflow-hidden shadow-inner">
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 dark:from-blue-400 dark:to-indigo-500 rounded-full transition-all duration-1000 ease-out shadow-[0_2px_10px_rgba(59,130,246,0.3)]"
               style={{ width: `${progressPercentage}%` }}
@@ -728,14 +901,12 @@ export const UserDashboard: React.FC = () => {
         <div className="lg:col-start-3 lg:row-start-1 space-y-6">
           <div
             className={`
-                p-5 rounded-2xl shadow-sm border transition-all duration-500 ease-in-out relative
-                ${
-                  todayEntry && MOOD_STYLES[todayEntry.mood]
-                    ? `${MOOD_STYLES[todayEntry.mood].bg} ${
-                        MOOD_STYLES[todayEntry.mood].border
-                      }`
-                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-                }
+              p-5 rounded-2xl shadow-sm border transition-all duration-500 ease-in-out
+              ${
+                todayEntry
+                  ? `${currentMoodStyle?.bg} ${currentMoodStyle?.border}`
+                  : "bg-white dark:bg-[#121620] border-slate-200 dark:border-white/10"
+              }
             `}
           >
             <div className="flex items-center gap-3 mb-3">
@@ -748,18 +919,14 @@ export const UserDashboard: React.FC = () => {
               >
                 <Smile
                   size={20}
-                  className={
-                    todayEntry && MOOD_STYLES[todayEntry.mood]
-                      ? MOOD_STYLES[todayEntry.mood].text
-                      : ""
-                  }
+                  className={todayEntry ? currentMoodStyle?.text : ""}
                 />
               </div>
               <div>
                 <h3
                   className={`font-bold leading-tight ${
-                    todayEntry && MOOD_STYLES[todayEntry.mood]
-                      ? MOOD_STYLES[todayEntry.mood].text
+                    todayEntry
+                      ? currentMoodStyle?.text
                       : "text-slate-800 dark:text-white"
                   }`}
                 >
@@ -767,8 +934,8 @@ export const UserDashboard: React.FC = () => {
                 </h3>
                 <p
                   className={`text-[10px] uppercase font-bold tracking-wide opacity-70 ${
-                    todayEntry && MOOD_STYLES[todayEntry.mood]
-                      ? MOOD_STYLES[todayEntry.mood].text
+                    todayEntry
+                      ? currentMoodStyle?.text
                       : "text-slate-500 dark:text-slate-400"
                   }`}
                 >
@@ -779,39 +946,35 @@ export const UserDashboard: React.FC = () => {
 
             <div
               className={`
-                    rounded-xl p-5 text-center transition-colors
-                    ${
-                      todayEntry
-                        ? "bg-white/40 dark:bg-black/20 border border-white/20"
-                        : "bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800"
-                    }
-                `}
+                rounded-xl p-5 text-center transition-colors
+                ${
+                  todayEntry
+                    ? "bg-white/40 dark:bg-black/20 border border-white/20"
+                    : "bg-slate-50 dark:bg-[#0B0E14] border border-slate-100 dark:border-white/5"
+                }
+              `}
             >
               {todayEntry ? (
                 <div className="animate-in fade-in zoom-in duration-300 flex flex-col items-center">
                   <div className="text-6xl mb-2 animate-pulse duration-[3000ms] inline-block filter drop-shadow-sm transform hover:scale-110 transition-transform cursor-default">
-                    {MOOD_STYLES[todayEntry.mood]?.emoji}
+                    {currentMoodStyle?.emoji}
                   </div>
                   <h4
-                    className={`text-2xl font-extrabold mb-1 ${
-                      MOOD_STYLES[todayEntry.mood]?.text
-                    }`}
+                    className={`text-2xl font-extrabold mb-1 ${currentMoodStyle?.text}`}
                   >
-                    {MOOD_STYLES[todayEntry.mood]?.label}
+                    {currentMoodStyle?.label}
                   </h4>
                   <p
-                    className={`text-xs mb-4 max-w-[200px] mx-auto leading-relaxed font-medium opacity-80 ${
-                      MOOD_STYLES[todayEntry.mood]?.text
-                    }`}
+                    className={`text-xs mb-4 max-w-[200px] mx-auto leading-relaxed font-medium opacity-80 ${currentMoodStyle?.text}`}
                   >
                     Você registrou que está se sentindo assim hoje.
                   </p>
                   <button
                     onClick={() => navigate("/journal")}
                     className={`
-                                    text-xs font-bold py-2 px-4 rounded-lg shadow-sm flex items-center gap-2 transition-all
-                                    bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:scale-105
-                                `}
+                      text-xs font-bold py-2 px-4 rounded-lg shadow-sm flex items-center gap-2 transition-all
+                      bg-white dark:bg-[#121620] text-slate-600 dark:text-slate-300 hover:scale-105
+                    `}
                   >
                     Ver Detalhes
                   </button>
@@ -846,31 +1009,79 @@ export const UserDashboard: React.FC = () => {
 
         {/* 2. ROUTINES CARD */}
         <div className="lg:col-span-2 lg:row-start-1 lg:row-span-2 space-y-6">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors relative">
+          <div
+            className={`
+              relative group p-6 rounded-2xl transition-all duration-500 ease-in-out
+              bg-white border border-blue-200 shadow-[0_0_25px_-5px_rgba(37,99,235,0.15)]
+              hover:shadow-[0_0_35px_-5px_rgba(37,99,235,0.25)] hover:border-blue-300
+              dark:bg-[#121620] dark:border-blue-500/30 
+              dark:shadow-[0_0_40px_-10px_rgba(37,99,235,0.15)] 
+              dark:hover:shadow-[0_0_50px_-10px_rgba(37,99,235,0.3)] 
+              dark:hover:border-blue-400/50
+              animate-[pulse_4s_ease-in-out_infinite]
+            `}
+          >
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <Sun size={20} className="text-amber-500" /> Rotinas
               </h3>
-              <div className="relative group">
+
+              <div className="relative group/add">
                 <button
                   onClick={openRoutineModalWithTutorial}
                   className="flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
                 >
                   <Plus size={14} /> Adicionar
                 </button>
+
                 {showRoutineTutorial && (
-                  <div className="absolute top-full right-0 mt-4 w-56 z-20 animate-in fade-in slide-in-from-top-2 duration-700">
-                    <div className="absolute -top-1.5 right-4 w-3 h-3 bg-white dark:bg-slate-700 border-t border-l border-slate-200 dark:border-slate-600 rotate-45 transform shadow-sm"></div>
-                    <div className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 p-4 rounded-xl shadow-xl relative">
+                  <div className="absolute top-full right-0 mt-4 w-80 z-30 animate-in fade-in slide-in-from-top-2 duration-500">
+                    <div
+                      className={`
+                        absolute -top-2 right-5 w-4 h-4 rotate-45 transform shadow-sm border-t border-l
+                        bg-white border-blue-100
+                        dark:bg-[#020617] dark:border-blue-500/30
+                      `}
+                    ></div>
+
+                    <div
+                      className={`
+                        p-5 rounded-2xl relative overflow-hidden flex gap-4
+                        bg-white border border-blue-100 shadow-2xl
+                        dark:bg-[#020617] dark:border-blue-500/30 dark:shadow-[0_0_40px_-10px_rgba(37,99,255,0.2)]
+                      `}
+                    >
                       <button
                         onClick={dismissRoutineTutorial}
-                        className="absolute top-2 right-2 text-slate-300 hover:text-slate-500 dark:text-slate-500 dark:hover:text-slate-300"
+                        className="absolute top-2 right-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors z-10"
                       >
-                        <X size={12} />
+                        <X size={14} />
                       </button>
-                      <p className="text-xs font-bold text-slate-700 dark:text-white leading-relaxed text-center pr-2">
-                        ✨ Clique aqui para criar sua rotina personalizada!
-                      </p>
+
+                      <div className="flex-shrink-0">
+                        <div className="p-3 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-100 dark:border-blue-500/20 text-amber-500 dark:text-[#facc15] shadow-inner">
+                          <Lightbulb size={24} strokeWidth={2.5} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-base font-bold text-slate-800 dark:text-white mb-1 leading-tight">
+                          Vamos começar?
+                        </h4>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                          Crie sua primeira{" "}
+                          <span className="text-blue-600 dark:text-blue-400 font-bold">
+                            rotina personalizada
+                          </span>{" "}
+                          para organizar seu dia com clareza.
+                        </p>
+                        <div
+                          className="mt-3 flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
+                          onClick={openRoutineModalWithTutorial}
+                        >
+                          Criar Agora <ArrowRight size={12} />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -879,7 +1090,7 @@ export const UserDashboard: React.FC = () => {
 
             <div className="space-y-3">
               {routines.length === 0 && (
-                <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-6 bg-slate-50 dark:bg-slate-700 rounded-xl">
+                <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-6 bg-slate-50 dark:bg-[#0B0E14] rounded-xl">
                   Sem rotinas ativas.
                 </p>
               )}
@@ -899,14 +1110,14 @@ export const UserDashboard: React.FC = () => {
                 return (
                   <div
                     key={routine.id}
-                    className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+                    className="border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
                   >
                     <div
-                      className="p-3 bg-white dark:bg-slate-800 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700"
+                      className="p-3 bg-white dark:bg-[#121620] flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-[#1A1F2C]"
                       onClick={() => fetchAndSelectRoutine(routine.id)}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400">
+                        <div className="p-2 bg-slate-100 dark:bg-[#0B0E14] rounded-lg text-slate-500 dark:text-slate-400">
                           {getCategoryIcon(routine.category)}
                         </div>
                         <div>
@@ -928,6 +1139,7 @@ export const UserDashboard: React.FC = () => {
                           </div>
                         </div>
                       </div>
+
                       {loadingRoutineId === routine.id ? (
                         <Loader2
                           className="animate-spin text-blue-500"
@@ -940,7 +1152,8 @@ export const UserDashboard: React.FC = () => {
                         />
                       )}
                     </div>
-                    <div className="h-1 w-full bg-slate-100 dark:bg-slate-700">
+
+                    <div className="h-1 w-full bg-slate-100 dark:bg-[#0B0E14]">
                       <div
                         className={`h-full ${
                           routineProgress === 100
@@ -959,8 +1172,9 @@ export const UserDashboard: React.FC = () => {
 
         {/* 3. WEEKLY SUMMARY CARD */}
         <div className="lg:col-start-3 lg:row-start-2 space-y-6">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 transition-all relative hover:shadow-xl duration-300">
+          <div className="bg-white dark:bg-[#121620] rounded-2xl shadow-lg border border-slate-200 dark:border-white/10 transition-all overflow-hidden relative hover:shadow-xl duration-300">
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600"></div>
+
             <div className="p-6 pb-2 flex justify-between items-center mt-2">
               <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400">
@@ -968,11 +1182,12 @@ export const UserDashboard: React.FC = () => {
                 </div>
                 <span className="text-lg">Resumo</span>
               </h3>
+
               <div className="relative group">
                 <select
                   value={periodFilter}
-                  onChange={(e) => setPeriodFilter(e.target.value)}
-                  className="appearance-none bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  onChange={(e) => setPeriodFilter(e.target.value as any)}
+                  className="appearance-none bg-slate-50 dark:bg-[#0B0E14] border border-slate-200 dark:border-white/10 rounded-lg pl-3 pr-8 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
                   <option>Hoje</option>
                   <option>Ontem</option>
@@ -1003,21 +1218,7 @@ export const UserDashboard: React.FC = () => {
 
               <div className="h-56 w-full mb-8 -ml-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={
-                      (metrics?.weeklySeries?.length ?? 0) > 0
-                        ? metrics!.weeklySeries
-                        : [
-                            { day: "Seg", value: 0 },
-                            { day: "Ter", value: 0 },
-                            { day: "Qua", value: 0 },
-                            { day: "Qui", value: 0 },
-                            { day: "Sex", value: 0 },
-                            { day: "Sab", value: 0 },
-                            { day: "Dom", value: 0 },
-                          ]
-                    }
-                  >
+                  <AreaChart data={chartData}>
                     <defs>
                       <linearGradient
                         id="strokeGradient"
@@ -1048,6 +1249,7 @@ export const UserDashboard: React.FC = () => {
                         />
                       </linearGradient>
                     </defs>
+
                     <CartesianGrid
                       vertical={false}
                       strokeDasharray="3 3"
@@ -1094,7 +1296,7 @@ export const UserDashboard: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                <div className="bg-slate-50 dark:bg-[#0B0E14] p-3 rounded-xl border border-slate-100 dark:border-white/10">
                   <div className="flex items-center justify-between mb-1">
                     <Target size={14} className="text-slate-400" />
                     <span className="text-[10px] font-bold text-green-500 flex items-center">
@@ -1108,7 +1310,8 @@ export const UserDashboard: React.FC = () => {
                     Micro-passos
                   </div>
                 </div>
-                <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+
+                <div className="bg-slate-50 dark:bg-[#0B0E14] p-3 rounded-xl border border-slate-100 dark:border-white/10">
                   <div className="flex items-center justify-between mb-1">
                     <Activity size={14} className="text-slate-400" />
                     <span className="text-[10px] font-bold text-slate-400">
@@ -1120,7 +1323,6 @@ export const UserDashboard: React.FC = () => {
                       ? "…"
                       : `${Math.round(metrics?.dailyAverage ?? 0)}/dia`}
                   </div>
-
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
                     Média Diária
                   </div>
@@ -1138,36 +1340,33 @@ export const UserDashboard: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  {[
-                    { key: "morning", label: "Rotina Matinal" },
-                    { key: "afternoon", label: "Rotina da Tarde" },
-                    { key: "night", label: "Rotina da Noite" },
-                  ].map(({ key, label }) => {
-                    const percent =
-                      metrics?.routineByCat?.[
-                        key as "morning" | "afternoon" | "night"
-                      ] ?? 0;
-                    const color =
-                      percent >= 80
-                        ? "text-green-500"
-                        : percent >= 50
-                        ? "text-amber-500"
-                        : "text-blue-500";
-
-                    return (
+                  {topRoutines.length === 0 ? (
+                    <div className="text-xs text-slate-400 dark:text-slate-500 italic px-1">
+                      Nenhuma rotina para resumir ainda.
+                    </div>
+                  ) : (
+                    topRoutines.map((r) => (
                       <div
-                        key={key}
-                        className="flex justify-between items-center p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                        key={r.id}
+                        className="flex justify-between items-center p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
                       >
                         <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                          {label}
+                          {r.title}
                         </div>
-                        <div className={`text-xs font-bold ${color}`}>
-                          {percent}%
+                        <div
+                          className={`text-xs font-bold ${
+                            r.progress >= 85
+                              ? "text-green-500"
+                              : r.progress >= 50
+                              ? "text-blue-500"
+                              : "text-amber-500"
+                          }`}
+                        >
+                          {r.progress}%
                         </div>
                       </div>
-                    );
-                  })}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -1175,8 +1374,7 @@ export const UserDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* --- MODALS (Mood, Detail, Add Routine) --- */}
-      {/* Kept largely same structure but functions updated above */}
+      {/* --- MOOD SUPPORT MODAL --- */}
       {showMoodModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-500">
           <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-md w-full p-8 text-center border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-300 relative overflow-hidden">
@@ -1202,10 +1400,11 @@ export const UserDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* --- ROUTINE DETAIL POPUP (ACTIVE ROUTINES) --- */}
       {selectedRoutine && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">
-            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-start">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+          <div className="bg-white dark:bg-[#121620] rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 border border-slate-200 dark:border-white/10">
+            <div className="p-6 border-b border-slate-100 dark:border-white/10 flex justify-between items-start">
               <div className="flex gap-4">
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-blue-600 dark:text-blue-400 h-fit">
                   {getCategoryIcon(selectedRoutine.category)}
@@ -1254,6 +1453,7 @@ export const UserDashboard: React.FC = () => {
                   )}
                 </div>
               </div>
+
               <div>
                 <div className="flex justify-between text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">
                   <span>Progresso</span>
@@ -1262,7 +1462,7 @@ export const UserDashboard: React.FC = () => {
                     {selectedRoutine.steps.length || 1}
                   </span>
                 </div>
-                <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-2 bg-slate-100 dark:bg-[#0B0E14] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-blue-500 transition-all duration-500"
                     style={{
@@ -1276,29 +1476,31 @@ export const UserDashboard: React.FC = () => {
                   ></div>
                 </div>
               </div>
+
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
                   Micro-tarefas
                 </label>
-                <div className="space-y-2 bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl">
+                <div className="space-y-2 bg-slate-50 dark:bg-[#0B0E14] p-4 rounded-xl">
                   {selectedRoutine.steps.length === 0 && (
                     <span className="text-sm text-slate-400 italic">
                       Apenas marcar como concluída.
                     </span>
                   )}
+
                   {selectedRoutine.steps.map((step) => (
                     <div
                       key={step.id}
                       onClick={() =>
                         toggleRoutineStep(selectedRoutine.id, step.id)
                       }
-                      className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors"
+                      className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white dark:hover:bg-[#1A1F2C] rounded-lg transition-colors"
                     >
                       <div
                         className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
                           step.completed
                             ? "bg-blue-500 border-blue-500 text-white"
-                            : "bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                            : "bg-white dark:bg-[#121620] border-slate-300 dark:border-slate-600"
                         }`}
                       >
                         {step.completed && <CheckCircle2 size={12} />}
@@ -1316,7 +1518,8 @@ export const UserDashboard: React.FC = () => {
                   ))}
                 </div>
               </div>
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+
+              <div className="pt-4 border-t border-slate-100 dark:border-white/10 flex justify-end">
                 <button
                   onClick={() => deleteRoutine(selectedRoutine.id)}
                   className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors"
@@ -1329,10 +1532,11 @@ export const UserDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* --- ADD ROUTINE MODAL --- */}
       {isRoutineModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-700">
-            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center sticky top-0 bg-white dark:bg-slate-800 z-10">
+          <div className="bg-white dark:bg-[#121620] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-white/10">
+            <div className="p-6 border-b border-slate-100 dark:border-white/10 flex justify-between items-center sticky top-0 bg-white dark:bg-[#121620] z-10">
               <h2 className="text-xl font-bold text-slate-800 dark:text-white">
                 Gerenciar Rotinas
               </h2>
@@ -1343,7 +1547,9 @@ export const UserDashboard: React.FC = () => {
                 <X size={24} />
               </button>
             </div>
-            <div className="flex border-b border-slate-200 dark:border-slate-700">
+
+            {/* Tabs */}
+            <div className="flex border-b border-slate-200 dark:border-white/10">
               <button
                 onClick={() => setRoutineTab("explore")}
                 className={`flex-1 py-4 text-sm font-bold border-b-2 ${
@@ -1411,7 +1617,7 @@ export const UserDashboard: React.FC = () => {
                   ].map((preset, i) => (
                     <div
                       key={i}
-                      className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 hover:border-blue-400 cursor-pointer transition-all group"
+                      className="border border-slate-200 dark:border-white/10 rounded-xl p-4 hover:border-blue-400 cursor-pointer transition-all group"
                       onClick={() => {
                         setNewRoutine({
                           title: preset.t,
@@ -1419,7 +1625,7 @@ export const UserDashboard: React.FC = () => {
                           time: preset.cat === "morning" ? "07:00" : "20:00",
                           frequency: ["Seg", "Ter", "Qua", "Qui", "Sex"],
                           steps: preset.items.map((txt) => ({
-                            id: Math.random().toString(),
+                            id: crypto.randomUUID(),
                             title: txt,
                             completed: false,
                           })),
@@ -1466,7 +1672,7 @@ export const UserDashboard: React.FC = () => {
                           type="time"
                           value={wakeTime}
                           onChange={(e) => setWakeTime(e.target.value)}
-                          className="w-full mt-1 p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white"
+                          className="w-full mt-1 p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#0B0E14] dark:text-white"
                         />
                       </div>
                       <div>
@@ -1477,7 +1683,7 @@ export const UserDashboard: React.FC = () => {
                           type="time"
                           value={sleepTime}
                           onChange={(e) => setSleepTime(e.target.value)}
-                          className="w-full mt-1 p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white"
+                          className="w-full mt-1 p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#0B0E14] dark:text-white"
                         />
                       </div>
                     </div>
@@ -1490,7 +1696,7 @@ export const UserDashboard: React.FC = () => {
                         value={userContext}
                         onChange={(e) => setUserContext(e.target.value)}
                         placeholder="Ex: Trabalho de casa, tenho dois filhos, gosto de treinar pela manhã..."
-                        className="w-full mt-1 p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white text-sm h-24 resize-none"
+                        className="w-full mt-1 p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#0B0E14] dark:text-white text-sm h-24 resize-none"
                       />
                     </div>
                   </div>
@@ -1522,10 +1728,11 @@ export const UserDashboard: React.FC = () => {
                       onChange={(e) =>
                         setNewRoutine({ ...newRoutine, title: e.target.value })
                       }
-                      className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white"
+                      className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#0B0E14] dark:text-white"
                       placeholder="Ex: Ritual da Manhã"
                     />
                   </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">
@@ -1537,9 +1744,10 @@ export const UserDashboard: React.FC = () => {
                         onChange={(e) =>
                           setNewRoutine({ ...newRoutine, time: e.target.value })
                         }
-                        className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white"
+                        className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#0B0E14] dark:text-white"
                       />
                     </div>
+
                     <div>
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">
                         Categoria
@@ -1552,7 +1760,7 @@ export const UserDashboard: React.FC = () => {
                             category: e.target.value as any,
                           })
                         }
-                        className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 dark:text-white"
+                        className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#0B0E14] dark:text-white"
                       >
                         <option value="morning">Manhã</option>
                         <option value="afternoon">Tarde</option>
@@ -1576,22 +1784,24 @@ export const UserDashboard: React.FC = () => {
                             key={day}
                             onClick={() => {
                               const freq = newRoutine.frequency || [];
-                              if (freq.includes(day))
+                              if (freq.includes(day)) {
                                 setNewRoutine({
                                   ...newRoutine,
                                   frequency: freq.filter((d) => d !== day),
                                 });
-                              else
+                              } else {
                                 setNewRoutine({
                                   ...newRoutine,
                                   frequency: [...freq, day],
                                 });
+                              }
                             }}
                             className={`text-xs px-3 py-1 rounded-full border ${
                               newRoutine.frequency?.includes(day)
                                 ? "bg-blue-600 text-white border-blue-600"
-                                : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600"
+                                : "bg-white dark:bg-[#0B0E14] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600"
                             }`}
+                            type="button"
                           >
                             {day}
                           </button>
@@ -1604,13 +1814,14 @@ export const UserDashboard: React.FC = () => {
                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">
                       Micro-tarefas (Passo a passo)
                     </label>
+
                     <div className="flex gap-2 mb-2">
                       <input
                         type="text"
                         value={tempStep}
                         onChange={(e) => setTempStep(e.target.value)}
                         placeholder="Adicionar passo..."
-                        className="flex-1 p-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white"
+                        className="flex-1 p-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-[#0B0E14] dark:text-white"
                         onKeyDown={(e) =>
                           e.key === "Enter" && addStepToRoutine()
                         }
@@ -1618,15 +1829,17 @@ export const UserDashboard: React.FC = () => {
                       <button
                         onClick={addStepToRoutine}
                         className="bg-slate-100 dark:bg-slate-700 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600"
+                        type="button"
                       >
                         <Plus />
                       </button>
                     </div>
+
                     <div className="space-y-1 max-h-40 overflow-y-auto">
                       {newRoutine.steps?.map((step, idx) => (
                         <div
-                          key={idx}
-                          className="flex justify-between items-center bg-slate-50 dark:bg-slate-700/50 p-2 rounded text-sm"
+                          key={step.id ?? idx}
+                          className="flex justify-between items-center bg-slate-50 dark:bg-[#0B0E14] p-2 rounded text-sm"
                         >
                           <span>
                             {idx + 1}. {step.title}
@@ -1634,6 +1847,7 @@ export const UserDashboard: React.FC = () => {
                           <button
                             onClick={() => removeStepFromRoutine(idx)}
                             className="text-red-400 hover:text-red-600"
+                            type="button"
                           >
                             <X size={14} />
                           </button>
@@ -1650,6 +1864,7 @@ export const UserDashboard: React.FC = () => {
                   <button
                     onClick={saveRoutine}
                     className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors"
+                    type="button"
                   >
                     Salvar Rotina
                   </button>

@@ -13,19 +13,21 @@ import { Pomodoro } from "./pages/Pomodoro";
 import { Journal } from "./pages/Journal";
 import { Sidebar } from "./components/Sidebar";
 import { AuthService } from "./services/authService";
+import { UserRole, PlanTier } from "./types";
 import { Resources } from "./pages/Resources";
 import { Community } from "./pages/Community";
 import { Menu, Loader2 } from "lucide-react";
-import { PlanTier, UserRole } from "./types";
 
 // --- Theme Context ---
 type Theme = "light" | "dark";
 interface ThemeContextType {
   theme: Theme;
+  toggleTheme: () => void;
 }
 
 export const ThemeContext = createContext<ThemeContextType>({
   theme: "dark",
+  toggleTheme: () => {},
 });
 
 const ProtectedRoute = ({
@@ -59,8 +61,8 @@ const ProtectedRoute = ({
 
     if (userLevel < requiredLevel) {
       return (
-        <div className="flex items-center justify-center h-full bg-slate-50 dark:bg-slate-900">
-          <div className="text-center p-8 bg-white dark:bg-slate-800 shadow-lg rounded-2xl max-w-md border border-slate-100 dark:border-slate-700">
+        <div className="flex items-center justify-center h-full bg-slate-50 dark:bg-[#0B0E14]">
+          <div className="text-center p-8 bg-white dark:bg-[#121620] shadow-lg rounded-2xl max-w-md border border-slate-100 dark:border-white/10">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-4">
               Funcionalidade Bloqueada
             </h2>
@@ -110,7 +112,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
   if (isLoginPage) return <>{children}</>;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#0B0E14] text-slate-900 dark:text-slate-100 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]">
       {user && (
         <Sidebar
           user={user}
@@ -118,13 +120,14 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
           onClose={() => setIsSidebarOpen(false)}
         />
       )}
-      <main className="flex-1 overflow-y-auto relative w-full">
+
+      <main className="flex-1 overflow-y-auto relative w-full scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-800">
         {/* Mobile Header with Hamburger */}
         {user && (
           <div className="md:hidden p-4 pb-0 flex items-center gap-3">
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+              className="p-2 bg-white dark:bg-[#121620] rounded-lg shadow-sm border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300"
             >
               <Menu size={24} />
             </button>
@@ -141,24 +144,39 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 };
 
 const App: React.FC = () => {
-  const theme: Theme = "dark";
+  // ✅ Frontend (tema com toggle + persistência)
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = localStorage.getItem("focuspro_theme");
+    return (saved as Theme) || "dark";
+  });
+
+  const toggleTheme = () => {
+    setTheme((prev) => {
+      const newTheme = prev === "light" ? "dark" : "light";
+      localStorage.setItem("focuspro_theme", newTheme);
+      return newTheme;
+    });
+  };
+
+  // ✅ Regra de negócio (sync de sessão + loading)
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    // Attempt to sync auth session on app load
-    AuthService.refreshSession().finally(() => setAuthLoading(false));
+    AuthService.refreshSession()
+      .catch(() => undefined)
+      .finally(() => setAuthLoading(false));
   }, []);
 
   if (authLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-white dark:bg-slate-900">
+      <div className="h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-[#0B0E14]">
         <Loader2 className="animate-spin text-blue-600" size={48} />
       </div>
     );
   }
 
   return (
-    <ThemeContext.Provider value={{ theme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
       <HashRouter>
         <Layout>
           <Routes>

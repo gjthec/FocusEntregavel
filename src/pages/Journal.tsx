@@ -9,15 +9,14 @@ import {
   TrendingUp,
   Tag,
   Sparkles,
-  ArrowRight,
   Check,
-  X,
   Clock,
   Quote,
   Activity,
   Smile,
   Layers,
   AlignLeft,
+  AlertCircle,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -32,7 +31,8 @@ import {
   Cell,
 } from "recharts";
 
-// --- CONSTANTS --- (Same as original file)
+// --- CONSTANTS ---
+
 const MOODS: {
   type: MoodType;
   emoji: string;
@@ -55,7 +55,7 @@ const MOODS: {
     emoji: "🙂",
     label: "Bem",
     color:
-      "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800",
+      "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-green-800",
     category: "positive",
     score: 4,
   },
@@ -64,7 +64,7 @@ const MOODS: {
     emoji: "😐",
     label: "Neutro",
     color:
-      "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600",
+      "bg-slate-100 text-slate-700 border-slate-200 dark:bg-[#121620] dark:text-slate-300 dark:border-white/10",
     category: "neutral",
     score: 3,
   },
@@ -151,10 +151,11 @@ const FEEDBACK_MESSAGES = {
     "Uma pausa leve pode te ajudar a recarregar a energia. Respeite seu descanso.",
 };
 
-// --- COMPONENTS ---
+// --- COMPONENT ---
 
 export const Journal: React.FC = () => {
   const user = AuthService.getCurrentUser();
+
   const [activeTab, setActiveTab] = useState<"daily" | "weekly" | "monthly">(
     "daily"
   );
@@ -166,29 +167,59 @@ export const Journal: React.FC = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [note, setNote] = useState("");
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      DataService.getJournalEntries(user.id)
-        .then(setEntries)
-        .catch(console.error);
-    }
+    if (!user) return;
+
+    DataService.getJournalEntries(user.id)
+      .then((list) => {
+        const sorted = [...list].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        setEntries(sorted);
+      })
+      .catch((err) => {
+        console.error(err);
+        setErrorToast("Erro ao carregar seus registros. Tente novamente.");
+        setTimeout(() => setErrorToast(null), 4000);
+      });
   }, [user?.id]);
 
   // --- HELPERS ---
 
-  const DEFAULT_MOOD = {
-    type: "neutral" as const,
-    emoji: "😐",
-    label: "Neutro",
-    color:
-      "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600",
-    category: "neutral" as const,
-    score: 3,
-  };
+  const DEFAULT_MOOD = useMemo(
+    () => ({
+      type: "neutral" as const,
+      emoji: "😐",
+      label: "Neutro",
+      color:
+        "bg-slate-100 text-slate-700 border-slate-200 dark:bg-[#121620] dark:text-slate-300 dark:border-white/10",
+      category: "neutral" as const,
+      score: 3,
+    }),
+    []
+  );
 
   const getMoodConfig = (type: MoodType) =>
     MOODS.find((m) => m.type === type) ?? DEFAULT_MOOD;
+
+  // Check if entry exists for today (regra do frontend 1)
+  const todayEntry = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return entries.find((e) => new Date(e.date).toDateString() === todayStr);
+  }, [entries]);
+
+  const handleMoodSelect = (type: MoodType) => {
+    if (todayEntry) {
+      setErrorToast(
+        "Você já registrou seu humor de hoje. Volte amanhã para registrar novamente."
+      );
+      setTimeout(() => setErrorToast(null), 4000);
+      return;
+    }
+    setSelectedMood(type);
+  };
 
   const handleReasonToggle = (reason: string) => {
     setSelectedReasons((prev) =>
@@ -220,11 +251,27 @@ export const Journal: React.FC = () => {
     return FEEDBACK_MESSAGES.negative;
   };
 
+  const genId = () => {
+    // crypto.randomUUID() (regra do 2), com fallback
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c: any = globalThis.crypto;
+    if (c?.randomUUID) return c.randomUUID();
+    return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  };
+
   const saveEntry = async () => {
     if (!user || !selectedMood) return;
 
+    if (todayEntry) {
+      setErrorToast(
+        "Você já registrou seu humor de hoje. Volte amanhã para registrar novamente."
+      );
+      setTimeout(() => setErrorToast(null), 4000);
+      return;
+    }
+
     const newEntry: JournalEntry = {
-      id: crypto.randomUUID(),
+      id: genId(),
       userId: user.id,
       date: new Date().toISOString(),
       mood: selectedMood,
@@ -233,7 +280,10 @@ export const Journal: React.FC = () => {
       content: note,
     };
 
-    setEntries([newEntry, ...entries]); // Optimistic
+    const prevEntries = entries;
+
+    // Optimistic (regra do 2)
+    setEntries([newEntry, ...entries]);
 
     // Reset Form
     setSelectedMood(null);
@@ -253,11 +303,16 @@ export const Journal: React.FC = () => {
       setTimeout(() => setSuccessToast(null), 4000);
     } catch (err) {
       console.error("Failed to save entry", err);
-      alert("Erro ao salvar entrada.");
+
+      // Reverte optimistic
+      setEntries(prevEntries);
+
+      setErrorToast("Erro ao salvar entrada. Tente novamente.");
+      setTimeout(() => setErrorToast(null), 4000);
     }
   };
 
-  // --- ANALYTICS CALCULATIONS (Unchanged Logic) ---
+  // --- ANALYTICS CALCULATIONS ---
 
   const getWeeklyData = () => {
     const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
@@ -281,10 +336,10 @@ export const Journal: React.FC = () => {
     return data.map((d) => ({ ...d, avg: d.count ? d.score / d.count : 0 }));
   };
 
-  const getAutoEvaluation = () => {
+  // AutoEvaluation (regra do 2: últimos 7 dias por média diária)
+  const autoEvaluation = useMemo(() => {
     if (!entries.length) return null;
 
-    // Últimos 7 dias (inclui hoje)
     const now = new Date();
     const weekStart = new Date(
       now.getFullYear(),
@@ -292,7 +347,6 @@ export const Journal: React.FC = () => {
       now.getDate() - 6
     );
 
-    // Helper: chave local YYYY-MM-DD
     const dayKey = (d: Date) => {
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -300,13 +354,11 @@ export const Journal: React.FC = () => {
       return `${yyyy}-${mm}-${dd}`;
     };
 
-    // Mapa de score por mood
     const moodScore: Record<MoodType, number> = MOODS.reduce((acc, m) => {
       acc[m.type] = m.score;
       return acc;
     }, {} as Record<MoodType, number>);
 
-    // Filtra semana e agrupa por dia
     const byDay: Record<
       string,
       { sum: number; count: number; reasons: string[] }
@@ -326,18 +378,15 @@ export const Journal: React.FC = () => {
     const dayKeys = Object.keys(byDay);
     if (!dayKeys.length) return null;
 
-    // Classifica por média do dia
     let goodDays = 0;
     let badDays = 0;
 
-    // Limiares: >3 positivo, <3 negativo, =3 neutro
     dayKeys.forEach((k) => {
       const avg = byDay[k].sum / byDay[k].count;
       if (avg > 3) goodDays += 1;
       else if (avg < 3) badDays += 1;
     });
 
-    // Motivo mais frequente na semana
     const allReasonsWeek = dayKeys.flatMap((k) => byDay[k].reasons);
     const topReason =
       allReasonsWeek.length === 0
@@ -351,8 +400,9 @@ export const Journal: React.FC = () => {
             .pop() ?? null;
 
     return { goodDays, badDays, topReason };
-  };
+  }, [entries]);
 
+  // --- MONTHLY ANALYTICS ENGINE ---
   const monthlyStats = useMemo(() => {
     const now = new Date();
     const currentMonthEntries = entries
@@ -402,14 +452,6 @@ export const Journal: React.FC = () => {
     let variationLabel = "Baixa";
     if (stdDev > 0.8) variationLabel = "Moderada";
     if (stdDev > 1.2) variationLabel = "Alta";
-
-    const sortedDesc = [...currentMonthEntries].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-    let streak = 0;
-    if (sortedDesc.length > 0) {
-      streak = 1;
-    }
 
     let insightTitle = "";
     let insightText = "";
@@ -487,7 +529,7 @@ export const Journal: React.FC = () => {
       streak:
         currentMonthEntries.length > 5
           ? "5+ dias"
-          : `${currentMonthEntries.length} dias`,
+          : `${currentMonthEntries.length} dias`, // simplificado
       insightTitle,
       insightText,
       suggestion,
@@ -498,9 +540,11 @@ export const Journal: React.FC = () => {
     };
   }, [entries]);
 
-  // --- RENDER (Unchanged) ---
+  // --- RENDER ---
+
   return (
     <div className="max-w-4xl mx-auto pb-20 font-sans">
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -510,12 +554,14 @@ export const Journal: React.FC = () => {
             Entenda seus padrões e melhore sua regulação emocional.
           </p>
         </div>
-        <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex shadow-inner">
+
+        {/* TABS */}
+        <div className="bg-slate-100 dark:bg-[#121620] p-1 rounded-xl flex shadow-inner">
           <button
             onClick={() => setActiveTab("daily")}
             className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
               activeTab === "daily"
-                ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transform scale-105"
+                ? "bg-white dark:bg-[#1A1F2C] text-blue-600 dark:text-blue-400 shadow-sm transform scale-105"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
             }`}
           >
@@ -525,7 +571,7 @@ export const Journal: React.FC = () => {
             onClick={() => setActiveTab("weekly")}
             className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
               activeTab === "weekly"
-                ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transform scale-105"
+                ? "bg-white dark:bg-[#1A1F2C] text-blue-600 dark:text-blue-400 shadow-sm transform scale-105"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
             }`}
           >
@@ -535,7 +581,7 @@ export const Journal: React.FC = () => {
             onClick={() => setActiveTab("monthly")}
             className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
               activeTab === "monthly"
-                ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transform scale-105"
+                ? "bg-white dark:bg-[#1A1F2C] text-blue-600 dark:text-blue-400 shadow-sm transform scale-105"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
             }`}
           >
@@ -544,39 +590,59 @@ export const Journal: React.FC = () => {
         </div>
       </div>
 
+      {/* --- TAB: DAILY --- */}
       {activeTab === "daily" && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8 transition-colors">
+          {/* MAIN CARD */}
+          <div className="bg-white dark:bg-[#121620] rounded-3xl shadow-sm border border-slate-200 dark:border-white/10 p-6 md:p-8 transition-colors">
+            {/* 1. MOOD TRACKER */}
             <div className="text-center mb-8">
               <h2 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-6">
-                Como você está se sentindo hoje?
+                {todayEntry
+                  ? "Você já registrou seu humor hoje!"
+                  : "Como você está se sentindo hoje?"}
               </h2>
+
               <div className="flex justify-center gap-2 md:gap-6 flex-wrap">
-                {MOODS.map((mood) => (
-                  <button
-                    key={mood.type}
-                    onClick={() => setSelectedMood(mood.type)}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl transition-all duration-200 group
-                                    ${
-                                      selectedMood === mood.type
-                                        ? `scale-110 ring-4 ring-offset-2 dark:ring-offset-slate-800 ring-blue-100 dark:ring-blue-900 ${mood.color}`
-                                        : "hover:bg-slate-50 dark:hover:bg-slate-700 opacity-70 hover:opacity-100 hover:scale-105"
-                                    }
-                                  `}
-                  >
-                    <span className="text-5xl drop-shadow-sm filter group-hover:brightness-110 transition-all">
-                      {mood.emoji}
-                    </span>
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
-                      {mood.label}
-                    </span>
-                  </button>
-                ))}
+                {MOODS.map((mood) => {
+                  const isLoggedToday =
+                    !!todayEntry && todayEntry.mood === mood.type;
+                  const isSelected = selectedMood === mood.type;
+                  const active = isSelected || isLoggedToday;
+                  const disabled = !!todayEntry;
+
+                  return (
+                    <button
+                      key={mood.type}
+                      onClick={() => handleMoodSelect(mood.type)}
+                      className={`flex flex-col items-center gap-2 p-4 rounded-2xl transition-all duration-200 group
+                        ${
+                          active
+                            ? `scale-110 ring-4 ring-offset-2 dark:ring-offset-slate-800 ring-blue-100 dark:ring-blue-900 ${mood.color}`
+                            : `hover:bg-slate-50 dark:hover:bg-[#1A1F2C] ${
+                                disabled
+                                  ? "opacity-40 cursor-not-allowed"
+                                  : "opacity-70 hover:opacity-100 hover:scale-105"
+                              }`
+                        }
+                      `}
+                    >
+                      <span className="text-5xl drop-shadow-sm filter transition-all">
+                        {mood.emoji}
+                      </span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                        {isLoggedToday ? "Registrado" : mood.label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {selectedMood && (
+            {/* 2. REASONS & FEEDBACK */}
+            {selectedMood && !todayEntry && (
               <div className="space-y-8 animate-in slide-in-from-top-4 fade-in duration-500">
+                {/* FEEDBACK BOX */}
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 p-4 rounded-xl flex items-start gap-3">
                   <Quote
                     className="text-blue-400 flex-shrink-0 mt-1"
@@ -586,6 +652,8 @@ export const Journal: React.FC = () => {
                     {getFeedback()}
                   </p>
                 </div>
+
+                {/* REASONS */}
                 <div>
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
                     O que impactou seu dia?
@@ -597,12 +665,12 @@ export const Journal: React.FC = () => {
                           key={reason}
                           onClick={() => handleReasonToggle(reason)}
                           className={`px-4 py-2 rounded-full text-sm font-medium border transition-all
-                                            ${
-                                              selectedReasons.includes(reason)
-                                                ? "bg-slate-800 dark:bg-blue-600 text-white border-slate-800 dark:border-blue-600 shadow-md"
-                                                : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-400"
-                                            }
-                                          `}
+                          ${
+                            selectedReasons.includes(reason)
+                              ? "bg-slate-800 dark:bg-blue-600 text-white border-slate-800 dark:border-blue-600 shadow-md"
+                              : "bg-white dark:bg-[#1A1F2C] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400 dark:hover:border-slate-400"
+                          }
+                        `}
                         >
                           {reason}
                         </button>
@@ -610,6 +678,8 @@ export const Journal: React.FC = () => {
                     )}
                   </div>
                 </div>
+
+                {/* TAGS */}
                 <div>
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
                     Tags (Contexto)
@@ -620,41 +690,47 @@ export const Journal: React.FC = () => {
                         key={tag}
                         onClick={() => handleTagToggle(tag)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border transition-all flex items-center gap-1
-                                            ${
-                                              selectedTags.includes(tag)
-                                                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
-                                                : "bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-100 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600"
-                                            }
-                                          `}
+                          ${
+                            selectedTags.includes(tag)
+                              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                              : "bg-slate-50 dark:bg-[#1A1F2C] text-slate-500 dark:text-slate-400 border-slate-100 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-[#1A1F2C]/80"
+                          }
+                        `}
                       >
                         <Tag size={12} /> {tag}
                       </button>
                     ))}
                   </div>
                 </div>
+
+                {/* 3. TEXT AREA & PROMPTS */}
                 <div>
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
                     Notas do dia
                   </label>
+
                   <div className="flex gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide">
                     {PROMPTS.map((p, i) => (
                       <button
                         key={i}
                         onClick={() => addPrompt(p)}
-                        className="whitespace-nowrap px-3 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-full text-xs text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 transition-colors"
+                        className="whitespace-nowrap px-3 py-1 bg-white dark:bg-[#1A1F2C] border border-slate-200 dark:border-white/10 rounded-full text-xs text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 transition-colors"
                       >
                         + {p}
                       </button>
                     ))}
                   </div>
+
                   <textarea
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Escreva livremente aqui..."
-                    className="w-full h-32 p-4 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition-all text-slate-700 dark:text-slate-200 placeholder-slate-400"
+                    className="w-full h-32 p-4 bg-slate-50 dark:bg-[#0B0E14] border border-slate-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition-all text-slate-700 dark:text-slate-200 placeholder-slate-400"
                   />
                 </div>
-                <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-700">
+
+                {/* SAVE BUTTON */}
+                <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-white/10">
                   <button
                     onClick={saveEntry}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg shadow-blue-200 dark:shadow-none transition-transform active:scale-95 flex items-center gap-2"
@@ -666,13 +742,15 @@ export const Journal: React.FC = () => {
             )}
           </div>
 
+          {/* HISTORY SECTION */}
           <div>
             <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
               <Clock size={20} className="text-slate-400" /> Histórico Recente
             </h3>
+
             <div className="space-y-4">
               {entries.length === 0 && (
-                <div className="text-center py-10 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-400">
+                <div className="text-center py-10 bg-white dark:bg-[#121620] rounded-2xl border border-dashed border-slate-200 dark:border-white/10 text-slate-400">
                   Nenhum registro ainda. Comece hoje!
                 </div>
               )}
@@ -682,15 +760,14 @@ export const Journal: React.FC = () => {
                 return (
                   <div
                     key={entry.id}
-                    className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-colors group"
+                    className="bg-white dark:bg-[#121620] p-6 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm hover:border-blue-200 dark:hover:border-blue-800 transition-colors group"
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-4">
-                        <div
-                          className={`text-4xl p-2 rounded-xl bg-slate-50 dark:bg-slate-700/50`}
-                        >
+                        <div className="text-4xl p-2 rounded-xl bg-slate-50 dark:bg-[#1A1F2C]">
                           {config.emoji}
                         </div>
+
                         <div>
                           <div className="flex items-center gap-2">
                             <span
@@ -700,6 +777,7 @@ export const Journal: React.FC = () => {
                             >
                               {config.label}
                             </span>
+
                             <span className="text-xs text-slate-400 dark:text-slate-500">
                               {new Date(entry.date).toLocaleDateString(
                                 "pt-BR",
@@ -719,7 +797,7 @@ export const Journal: React.FC = () => {
                               {entry.reasons.map((r, i) => (
                                 <span
                                   key={i}
-                                  className="text-xs text-slate-600 dark:text-slate-300 font-medium bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full"
+                                  className="text-xs text-slate-600 dark:text-slate-300 font-medium bg-slate-100 dark:bg-[#1A1F2C] px-2 py-0.5 rounded-full"
                                 >
                                   {r}
                                 </span>
@@ -731,13 +809,13 @@ export const Journal: React.FC = () => {
                     </div>
 
                     {entry.content && (
-                      <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl text-slate-700 dark:text-slate-300 text-sm whitespace-pre-wrap leading-relaxed border border-slate-100 dark:border-slate-600">
+                      <div className="bg-slate-50 dark:bg-[#0B0E14]/50 p-4 rounded-xl text-slate-700 dark:text-slate-300 text-sm whitespace-pre-wrap leading-relaxed border border-slate-100 dark:border-white/5">
                         {entry.content}
                       </div>
                     )}
 
                     {entry.tags.length > 0 && (
-                      <div className="flex gap-2 mt-4 pt-4 border-t border-slate-50 dark:border-slate-700">
+                      <div className="flex gap-2 mt-4 pt-4 border-t border-slate-50 dark:border-white/5">
                         {entry.tags.map((t, i) => (
                           <span
                             key={i}
@@ -756,9 +834,10 @@ export const Journal: React.FC = () => {
         </div>
       )}
 
-      {/* Stats Views Logic Same As Before - Rendering Components Unchanged */}
+      {/* --- TAB: WEEKLY --- */}
       {activeTab === "weekly" && (
         <div className="space-y-6 animate-in fade-in">
+          {/* AUTO EVALUATION CARD */}
           <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
             <div className="flex items-start justify-between">
               <div>
@@ -767,11 +846,11 @@ export const Journal: React.FC = () => {
                   Uma visão geral da sua saúde emocional.
                 </p>
 
-                {getAutoEvaluation() ? (
+                {autoEvaluation ? (
                   <div className="flex gap-8">
                     <div>
                       <div className="text-3xl font-bold">
-                        {getAutoEvaluation()?.goodDays}
+                        {autoEvaluation.goodDays}
                       </div>
                       <div className="text-xs opacity-75 uppercase font-bold">
                         Dias Bons
@@ -779,16 +858,16 @@ export const Journal: React.FC = () => {
                     </div>
                     <div>
                       <div className="text-3xl font-bold">
-                        {getAutoEvaluation()?.badDays}
+                        {autoEvaluation.badDays}
                       </div>
                       <div className="text-xs opacity-75 uppercase font-bold">
                         Dias Difíceis
                       </div>
                     </div>
-                    {getAutoEvaluation()?.topReason && (
+                    {autoEvaluation.topReason && (
                       <div>
                         <div className="text-lg font-bold truncate max-w-[120px]">
-                          {getAutoEvaluation()?.topReason}
+                          {autoEvaluation.topReason}
                         </div>
                         <div className="text-xs opacity-75 uppercase font-bold">
                           Maior Impacto
@@ -802,11 +881,13 @@ export const Journal: React.FC = () => {
                   </div>
                 )}
               </div>
+
               <BarChart2 size={64} className="opacity-20" />
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+          {/* CHART */}
+          <div className="bg-white dark:bg-[#121620] p-6 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm transition-colors">
             <h3 className="font-bold text-slate-800 dark:text-white mb-6">
               Variação de Humor (7 Dias)
             </h3>
@@ -819,6 +900,7 @@ export const Journal: React.FC = () => {
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
+
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
@@ -862,10 +944,27 @@ export const Journal: React.FC = () => {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Suggestion card (do frontend 1) */}
+          <div className="bg-white dark:bg-[#121620] p-6 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm flex items-center gap-4 transition-colors">
+            <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-full text-green-600 dark:text-green-400">
+              <Sparkles size={24} />
+            </div>
+            <div>
+              <h4 className="font-bold text-slate-800 dark:text-white">
+                Sugestão da Semana
+              </h4>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {autoEvaluation && autoEvaluation.badDays > 2
+                  ? "Essa semana foi desafiadora. Tente aumentar suas pausas e reduzir a lista de tarefas."
+                  : "Você está mantendo um bom equilíbrio! Continue celebrando as pequenas vitórias."}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Monthly Stats View */}
+      {/* --- TAB: MONTHLY --- */}
       {activeTab === "monthly" && (
         <div className="space-y-8 animate-in fade-in">
           <div className="text-center md:text-left mb-4">
@@ -876,9 +975,10 @@ export const Journal: React.FC = () => {
               Uma análise completa das suas emoções, padrões e influências.
             </p>
           </div>
+
           {!monthlyStats ? (
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 p-12 text-center transition-colors">
-              <div className="bg-white dark:bg-slate-700 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-sm text-slate-300 dark:text-slate-400">
+            <div className="bg-slate-50 dark:bg-[#121620] rounded-3xl border border-dashed border-slate-200 dark:border-white/10 p-12 text-center transition-colors">
+              <div className="bg-white dark:bg-[#1A1F2C] p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-sm text-slate-300 dark:text-slate-400">
                 <BarChart2 size={32} />
               </div>
               <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200">
@@ -897,8 +997,9 @@ export const Journal: React.FC = () => {
             </div>
           ) : (
             <>
+              {/* KPI CARDS */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+                <div className="bg-white dark:bg-[#121620] p-5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm transition-colors">
                   <div className="text-slate-400 mb-2">
                     <Layers size={18} />
                   </div>
@@ -909,7 +1010,8 @@ export const Journal: React.FC = () => {
                     Entradas
                   </div>
                 </div>
-                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+
+                <div className="bg-white dark:bg-[#121620] p-5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm transition-colors">
                   <div className="text-slate-400 mb-2">
                     <Smile size={18} />
                   </div>
@@ -920,7 +1022,8 @@ export const Journal: React.FC = () => {
                     Predominante
                   </div>
                 </div>
-                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+
+                <div className="bg-white dark:bg-[#121620] p-5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm transition-colors">
                   <div className="text-slate-400 mb-2">
                     <Activity size={18} />
                   </div>
@@ -931,7 +1034,8 @@ export const Journal: React.FC = () => {
                     Variação
                   </div>
                 </div>
-                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+
+                <div className="bg-white dark:bg-[#121620] p-5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm transition-colors">
                   <div className="text-slate-400 mb-2">
                     <Calendar size={18} />
                   </div>
@@ -943,16 +1047,267 @@ export const Journal: React.FC = () => {
                   </div>
                 </div>
               </div>
-              {/* ... (Existing chart renderings) ... */}
+
+              {/* MAIN CHARTS SECTION */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* LEFT: Timeline Chart */}
+                <div className="lg:col-span-2 bg-white dark:bg-[#121620] p-6 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm transition-colors">
+                  <h3 className="font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                    <TrendingUp size={18} className="text-blue-500" /> Linha do
+                    Humor
+                  </h3>
+
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={monthlyStats.timelineData}>
+                        <defs>
+                          <linearGradient
+                            id="colorMood"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="#6366f1"
+                              stopOpacity={0.1}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#6366f1"
+                              stopOpacity={0}
+                            />
+                          </linearGradient>
+                        </defs>
+
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={false}
+                          stroke="#f1f5f9"
+                          className="dark:opacity-20"
+                        />
+                        <XAxis
+                          dataKey="date"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: "#94a3b8", fontSize: 12 }}
+                        />
+                        <YAxis domain={[1, 5]} hide />
+
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = (payload[0] as any).payload;
+                              return (
+                                <div className="bg-white dark:bg-slate-700 p-4 rounded-xl shadow-xl border border-slate-100 dark:border-slate-600 max-w-[200px]">
+                                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-50 dark:border-slate-600">
+                                    <span className="text-2xl">
+                                      {data.moodEmoji}
+                                    </span>
+                                    <div>
+                                      <div className="font-bold text-slate-800 dark:text-white text-sm">
+                                        {data.moodLabel}
+                                      </div>
+                                      <div className="text-xs text-slate-400 dark:text-slate-300">
+                                        {data.fullDate}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {data.reasons && (
+                                    <div className="text-xs text-slate-600 dark:text-slate-300 mb-1">
+                                      <span className="font-bold">
+                                        Motivos:
+                                      </span>{" "}
+                                      {data.reasons}
+                                    </div>
+                                  )}
+                                  {data.tags && (
+                                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                                      <span className="font-bold text-blue-500 dark:text-blue-400">
+                                        #
+                                      </span>{" "}
+                                      {data.tags}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+
+                        <Area
+                          type="monotone"
+                          dataKey="score"
+                          stroke="#6366f1"
+                          strokeWidth={3}
+                          fillOpacity={1}
+                          fill="url(#colorMood)"
+                          activeDot={{ r: 6, strokeWidth: 0, fill: "#4f46e5" }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* RIGHT: Distribution Chart */}
+                <div className="bg-white dark:bg-[#121620] p-6 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm transition-colors">
+                  <h3 className="font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                    <AlignLeft size={18} className="text-blue-500" />{" "}
+                    Distribuição
+                  </h3>
+
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        layout="vertical"
+                        data={monthlyStats.distributionData}
+                      >
+                        <XAxis type="number" hide />
+                        <YAxis
+                          dataKey="name"
+                          type="category"
+                          width={60}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 12, fill: "#64748b" }}
+                        />
+                        <Tooltip
+                          cursor={{ fill: "transparent" }}
+                          contentStyle={{
+                            borderRadius: "8px",
+                            border: "none",
+                            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                          }}
+                        />
+                        <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={20}>
+                          {monthlyStats.distributionData.map(
+                            (entry: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={entry.fill} />
+                            )
+                          )}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* INSIGHTS & TAGS ROW */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Dynamic Insight Card */}
+                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                  <Sparkles
+                    className="absolute top-4 right-4 opacity-20"
+                    size={64}
+                  />
+                  <div className="relative z-10">
+                    <h3 className="text-xl font-bold mb-2">
+                      {monthlyStats.insightTitle}
+                    </h3>
+                    <p className="text-blue-100 text-sm leading-relaxed mb-6">
+                      {monthlyStats.insightText}
+                    </p>
+                    <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10">
+                      <div className="text-xs font-bold uppercase opacity-70 mb-1 flex items-center gap-1">
+                        <Sparkles size={12} /> Sugestão do Mês
+                      </div>
+                      <div className="font-medium text-sm">
+                        "{monthlyStats.suggestion}"
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top Tags */}
+                <div className="bg-white dark:bg-[#121620] p-6 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm transition-colors">
+                  <h3 className="font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                    <Tag size={18} className="text-blue-500" /> Tags Mais Usadas
+                  </h3>
+                  <div className="flex flex-wrap gap-2 content-start">
+                    {monthlyStats.topTags.map((t: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-[#1A1F2C] rounded-lg border border-slate-100 dark:border-white/5"
+                      >
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                          {t.tag}
+                        </span>
+                        <span className="text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full">
+                          {t.count}
+                        </span>
+                      </div>
+                    ))}
+                    {monthlyStats.topTags.length === 0 && (
+                      <span className="text-slate-400 text-sm">
+                        Sem tags registradas.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* MONTHLY HISTORY LIST */}
+              <div>
+                <h3 className="font-bold text-slate-800 dark:text-white mb-4 ml-1">
+                  Registros do Mês
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {monthlyStats.entries.map((entry: JournalEntry) => {
+                    const config = getMoodConfig(entry.mood);
+                    return (
+                      <div
+                        key={entry.id}
+                        className="bg-white dark:bg-[#121620] p-4 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors flex justify-between items-center group cursor-pointer"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="text-3xl">{config.emoji}</div>
+                          <div>
+                            <div className="font-bold text-slate-700 dark:text-slate-200 text-sm">
+                              {new Date(entry.date).toLocaleDateString(
+                                "pt-BR",
+                                { day: "numeric", month: "long" }
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-400">
+                              {entry.tags[0] || "Sem tag"} •{" "}
+                              {entry.reasons[0] || "Sem motivo"}
+                            </div>
+                          </div>
+                        </div>
+                        <button className="text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity text-sm font-bold">
+                          Ver
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="text-center pt-8 text-slate-400 text-sm font-medium">
+                "Registrar suas emoções transforma sua jornada. Continue assim!"
+              </div>
             </>
           )}
         </div>
       )}
 
-      {successToast && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-8 z-50">
-          <Check size={20} className="text-green-400 dark:text-green-600" />
-          <span className="font-medium">{successToast}</span>
+      {/* TOAST NOTIFICATION */}
+      {(successToast || errorToast) && (
+        <div
+          className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-8 z-50 ${
+            errorToast
+              ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/80 dark:text-white"
+              : "bg-slate-800 dark:bg-white text-white dark:text-slate-900"
+          }`}
+        >
+          {errorToast ? (
+            <AlertCircle size={20} />
+          ) : (
+            <Check size={20} className="text-green-400 dark:text-green-600" />
+          )}
+          <span className="font-medium">{successToast || errorToast}</span>
         </div>
       )}
     </div>
