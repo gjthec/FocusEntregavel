@@ -5,6 +5,7 @@ import { User, PlanTier, UserRole } from "../types";
 import {
   Search,
   Edit,
+  Save,
   Check,
   ShieldAlert,
   UserPlus,
@@ -31,7 +32,6 @@ export const AdminDashboard: React.FC = () => {
     type: "success" | "error";
     msg: string;
   } | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -103,7 +103,6 @@ export const AdminDashboard: React.FC = () => {
   const startEdit = (user: User) => {
     setEditingId(user.id);
     setEditPlan(user.plan);
-    setEditRole(user.role);
   };
 
   const saveEdit = async (userId: string) => {
@@ -130,34 +129,17 @@ export const AdminDashboard: React.FC = () => {
   const PlanBadge = ({ plan }: { plan: PlanTier }) => {
     const colors = {
       [PlanTier.BASIC]:
-        "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300",
+        "bg-[rgba(77,170,255,0.22)] text-[#2563EB] dark:text-[#4DAAFF] border border-[#3A8DFF]",
       [PlanTier.PRO]:
-        "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
+        "bg-[rgba(122,63,255,0.22)] text-[#7C3AED] dark:text-[#7A3FFF] border border-[#6D28D9]",
       [PlanTier.PREMIUM]:
-        "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400",
+        "bg-[rgba(255,215,100,0.25)] text-[#D97706] dark:text-[#FFD763] border border-[#F2C443]",
     };
     return (
       <span
         className={`px-2 py-1 rounded-full text-xs font-bold ${colors[plan]}`}
       >
         {plan.toUpperCase()}
-      </span>
-    );
-  };
-
-  const RoleBadge = ({ role }: { role: UserRole }) => {
-    const colors = {
-      [UserRole.ADMIN]:
-        "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300",
-      [UserRole.USER]:
-        "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300",
-    };
-
-    return (
-      <span
-        className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${colors[role]}`}
-      >
-        {role}
       </span>
     );
   };
@@ -173,11 +155,6 @@ export const AdminDashboard: React.FC = () => {
           <p className="text-slate-500 dark:text-slate-400">
             Gerenciar usuários e assinaturas.
           </p>
-          {loadError && (
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-              {loadError}
-            </p>
-          )}
         </div>
         <div className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-2 w-full md:w-64 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
           <Search size={20} className="text-slate-400" />
@@ -294,9 +271,6 @@ export const AdminDashboard: React.FC = () => {
                   E-mail
                 </th>
                 <th className="p-4 font-semibold text-slate-600 dark:text-slate-300 text-sm">
-                  Função
-                </th>
-                <th className="p-4 font-semibold text-slate-600 dark:text-slate-300 text-sm">
                   Data de Entrada
                 </th>
                 <th className="p-4 font-semibold text-slate-600 dark:text-slate-300 text-sm">
@@ -328,22 +302,6 @@ export const AdminDashboard: React.FC = () => {
                     </td>
                     <td className="p-4 text-slate-600 dark:text-slate-300">
                       {user.email}
-                    </td>
-                    <td className="p-4">
-                      {editingId === user.id ? (
-                        <select
-                          value={editRole}
-                          onChange={(e) =>
-                            setEditRole(e.target.value as UserRole)
-                          }
-                          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1 text-sm outline-none focus:border-blue-500 text-slate-900 dark:text-white"
-                        >
-                          <option value={UserRole.USER}>Usuário</option>
-                          <option value={UserRole.ADMIN}>Administrador</option>
-                        </select>
-                      ) : (
-                        <RoleBadge role={user.role} />
-                      )}
                     </td>
                     <td className="p-4 text-slate-500 dark:text-slate-400 text-sm">
                       {new Date(user.joinedDate).toLocaleDateString()}
@@ -390,7 +348,7 @@ export const AdminDashboard: React.FC = () => {
                               <button
                                 onClick={() => startEdit(user)}
                                 className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                                title="Editar Plano e Função"
+                                title="Editar Plano"
                               >
                                 <Edit size={18} />
                               </button>
