@@ -1,14 +1,7 @@
-import React, {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { User, UserRole, PlanTier } from "../types";
 import { AuthService } from "../services/authService";
-import { ThemeContext } from "../App";
 import {
   LayoutDashboard,
   Clock,
@@ -18,8 +11,6 @@ import {
   LogOut,
   Crown,
   BrainCircuit,
-  Sun,
-  Moon,
   X,
   Users,
   Sparkles,
@@ -45,7 +36,6 @@ type NavVariant =
 
 export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
   const location = useLocation();
-  const { theme, toggleTheme } = useContext(ThemeContext);
 
   // ✅ Regras de negócio (visitas + modal de upgrade)
   const storageKey = useMemo(() => `focuspro_nav_visits_${user.id}`, [user.id]);
@@ -543,40 +533,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, onClose }) => {
 
         {/* Footer Actions */}
         <div className="p-4 border-t border-[#D1D5DB] dark:border-white/5 space-y-2 bg-[#F9FAFB] dark:bg-[#0B0E14]/50 backdrop-blur-md">
-          <button
-            onClick={toggleTheme}
-            className={`
-              flex items-center px-4 py-3 text-[#374151] dark:text-slate-400 hover:text-[#111827] dark:hover:text-white transition-all duration-300 w-full rounded-xl hover:bg-[#F3F4F6] dark:hover:bg-white/5 border border-transparent hover:border-[#E5E7EB] dark:hover:border-white/5
-              md:justify-center md:group-hover:justify-start group/action
-            `}
-            title={theme === "light" ? "Modo Escuro" : "Modo Claro"}
-          >
-            <div className="relative">
-              {theme === "light" ? (
-                <Moon
-                  size={20}
-                  className="group-hover/action:scale-110 transition-transform"
-                />
-              ) : (
-                <Sun
-                  size={20}
-                  className="group-hover/action:scale-110 transition-transform"
-                />
-              )}
-              <div className="hidden dark:block absolute inset-0 bg-white/20 blur-md opacity-0 group-hover/action:opacity-100 transition-opacity" />
-            </div>
-
-            <span
-              className={`
-                whitespace-nowrap overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]
-                ml-3 md:ml-0 md:w-0 md:opacity-0 md:group-hover:w-auto md:group-hover:opacity-100 md:group-hover:ml-3
-                text-sm font-bold text-[#374151] dark:font-medium dark:text-slate-400
-              `}
-            >
-              {theme === "light" ? "Modo Escuro" : "Modo Claro"}
-            </span>
-          </button>
-
           <button
             onClick={AuthService.logout}
             className={`

@@ -96,12 +96,8 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // Apply theme class to HTML element
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    document.documentElement.classList.add("dark");
+    return () => document.documentElement.classList.remove("dark");
   }, [theme]);
 
   // Close sidebar on route change (mobile UX)
@@ -144,19 +140,8 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 };
 
 const App: React.FC = () => {
-  // ✅ Frontend (tema com toggle + persistência)
-  const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem("focuspro_theme");
-    return (saved as Theme) || "dark";
-  });
-
-  const toggleTheme = () => {
-    setTheme((prev) => {
-      const newTheme = prev === "light" ? "dark" : "light";
-      localStorage.setItem("focuspro_theme", newTheme);
-      return newTheme;
-    });
-  };
+  const [theme] = useState<Theme>("dark");
+  const toggleTheme = () => {};
 
   // ✅ Regra de negócio (sync de sessão + loading)
   const [authLoading, setAuthLoading] = useState(true);
